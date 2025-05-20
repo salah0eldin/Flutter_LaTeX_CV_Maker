@@ -1,39 +1,93 @@
+// =====================================
+// Imports and Dependencies
+// =====================================
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/vs2015.dart';
+import 'package:code_text_field/code_text_field.dart';
+import 'package:highlight/languages/json.dart';
+import 'dart:convert';
 import '../providers/cv_data_provider.dart';
 
+// =====================================
+// JsonView Widget
+// =====================================
 class JsonView extends StatefulWidget {
-  const JsonView({super.key});
+  final VoidCallback? onSave;
+  final VoidCallback? onCancel;
+  const JsonView({super.key, this.onSave, this.onCancel});
 
   @override
   State<JsonView> createState() => _JsonViewState();
 }
 
+// =====================================
+// _JsonViewState
+// =====================================
 class _JsonViewState extends State<JsonView> {
   bool _editing = false;
   late TextEditingController _controller;
+  late CodeController _codeController;
   String? _originalData;
 
+  // =====================================
+  // initState & dispose
+  // =====================================
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _codeController = CodeController(text: '', language: json);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
+  // =====================================
+  // Edit/Cancel/Save/Update Logic
+  // =====================================
   void _startEdit(CVDataProvider provider) {
+    // Save the current selection before editing
+    final oldSelection = _codeController.selection;
     setState(() {
       _editing = true;
       _originalData = provider.jsonData;
-      _controller.text = provider.jsonData;
+      // Pretty-print JSON for editing
+      String prettyJson;
+      try {
+        final decoded =
+            provider.jsonData.isNotEmpty ? jsonDecode(provider.jsonData) : null;
+        prettyJson =
+            decoded != null
+                ? const JsonEncoder.withIndent('  ').convert(decoded)
+                : '';
+      } catch (e) {
+        // Fallback: use raw data if parsing fails
+        prettyJson = provider.jsonData;
+      }
+      _codeController.text = prettyJson;
+      // Try to restore the selection if possible
+      int offset = oldSelection.baseOffset;
+      if (offset > prettyJson.length) offset = prettyJson.length;
+      _codeController.selection = TextSelection.collapsed(offset: offset);
       provider.setEditMode(EditMode.json);
+      // Show a quick pop down message about lag workaround
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'If editing lags, copy and paste the whole file to refresh the editor. This is a Flutter limitation.',
+            style: TextStyle(color: Colors.white),
+          ),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.lightBlue,
+        ),
+      );
     });
   }
 
@@ -62,15 +116,17 @@ class _JsonViewState extends State<JsonView> {
         _controller.text = _originalData ?? provider.jsonData;
         provider.cancelEdit();
       });
+      if (widget.onCancel != null) widget.onCancel!();
     }
   }
 
   void _saveEdit(CVDataProvider provider) {
-    provider.updateJsonData(_controller.text);
+    provider.updateJsonData(_codeController.text);
     provider.setEditMode(EditMode.none);
     setState(() {
       _editing = false;
     });
+    if (widget.onSave != null) widget.onSave!();
   }
 
   void _updateView(CVDataProvider provider) {
@@ -81,6 +137,9 @@ class _JsonViewState extends State<JsonView> {
     }
   }
 
+  // =====================================
+  // Build Method
+  // =====================================
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CVDataProvider>();
@@ -98,56 +157,120 @@ class _JsonViewState extends State<JsonView> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              if (!isEditing)
-                ElevatedButton.icon(
-                  onPressed: isOtherEditing ? null : () => _startEdit(provider),
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Edit'),
-                ),
-              if (isEditing)
-                ElevatedButton.icon(
-                  onPressed: () => _cancelEdit(provider),
-                  icon: const Icon(Icons.cancel),
-                  label: const Text('Cancel'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: isEditing ? () => _saveEdit(provider) : null,
-                icon: const Icon(Icons.save),
-                label: const Text('Save'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () => _updateView(provider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Update'),
-              ),
-            ],
+          // =====================================
+          // Action Buttons Row
+          // =====================================
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 380;
+              return isNarrow
+                  ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!isEditing)
+                        ElevatedButton.icon(
+                          onPressed:
+                              isOtherEditing
+                                  ? null
+                                  : () => _startEdit(provider),
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Edit'),
+                        ),
+                      if (isEditing) ...[
+                        ElevatedButton.icon(
+                          onPressed: () => _cancelEdit(provider),
+                          icon: const Icon(Icons.cancel),
+                          label: const Text('Cancel'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      ElevatedButton.icon(
+                        onPressed: isEditing ? () => _saveEdit(provider) : null,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save'),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed:
+                            (!isEditing && !isOtherEditing)
+                                ? () => _updateView(provider)
+                                : null,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Update'),
+                      ),
+                    ],
+                  )
+                  : Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (!isEditing)
+                        ElevatedButton.icon(
+                          onPressed:
+                              isOtherEditing
+                                  ? null
+                                  : () => _startEdit(provider),
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Edit'),
+                        ),
+                      if (isEditing) ...[
+                        ElevatedButton.icon(
+                          onPressed: () => _cancelEdit(provider),
+                          icon: const Icon(Icons.cancel),
+                          label: const Text('Cancel'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      ElevatedButton.icon(
+                        onPressed: isEditing ? () => _saveEdit(provider) : null,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed:
+                            (!isEditing && !isOtherEditing)
+                                ? () => _updateView(provider)
+                                : null,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Update'),
+                      ),
+                    ],
+                  );
+            },
           ),
           const SizedBox(height: 8),
+          // =====================================
+          // Editor/Viewer
+          // =====================================
           if (isEditing)
-            // Use Expanded to provide constraints inside Column, with a plain TextField for best performance
+            // Use CodeField for editing JSON with syntax highlighting and better performance
             Expanded(
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                style: const TextStyle(
+              child: CodeField(
+                controller: _codeController,
+                textStyle: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 14,
-                  color: Colors.black,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'No JSON loaded.',
-                  hintStyle: TextStyle(color: Colors.black26),
-                  contentPadding: EdgeInsets.zero,
+                expands: true,
+                maxLines: null,
+                minLines: null,
+                background: Theme.of(context).scaffoldBackgroundColor,
+                cursorColor: Theme.of(context).colorScheme.primary,
+                lineNumberStyle: LineNumberStyle(
+                  textStyle: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.secondary.withOpacity(0.7),
+                  ),
                 ),
-                autofocus: true,
-                cursorColor: Colors.blue,
+                // No language param here, syntax highlighting is set via CodeController
               ),
             )
           else
