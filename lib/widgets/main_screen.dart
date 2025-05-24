@@ -302,8 +302,12 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                           .split('/')
                           .last
                           .replaceAll('.json', '');
+                      final modified = file.statSync().modified;
+                      final dateStr =
+                          '${modified.year.toString().padLeft(4, '0')}-${modified.month.toString().padLeft(2, '0')}-${modified.day.toString().padLeft(2, '0')} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}';
                       return ListTile(
                         title: Text(fileName),
+                        subtitle: Text('Saved: $dateStr'),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           tooltip: 'Delete',
@@ -658,6 +662,20 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                     ? NavigationBar(
                       selectedIndex: _selectedIndex,
                       onDestinationSelected: (int index) {
+                        // Prevent navigation if editing
+                        final editMode =
+                            context.read<CVDataProvider>().editMode;
+                        if (editMode != EditMode.none) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Finish or cancel editing before switching views.',
+                              ),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
                         setState(() {
                           _selectedIndex = index;
                         });

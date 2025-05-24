@@ -92,6 +92,17 @@ class _JsonViewState extends State<JsonView> {
   }
 
   void _cancelEdit(CVDataProvider provider) async {
+    // Only confirm if there are unsaved changes
+    final currentText = _codeController.text;
+    final originalText = _originalData ?? provider.jsonData;
+    if (currentText == originalText) {
+      setState(() {
+        _editing = false;
+        provider.cancelEdit();
+      });
+      if (widget.onCancel != null) widget.onCancel!();
+      return;
+    }
     final shouldCancel = await showDialog<bool>(
       context: context,
       builder:
@@ -113,7 +124,7 @@ class _JsonViewState extends State<JsonView> {
     if (shouldCancel == true) {
       setState(() {
         _editing = false;
-        _controller.text = _originalData ?? provider.jsonData;
+        _controller.text = originalText;
         provider.cancelEdit();
       });
       if (widget.onCancel != null) widget.onCancel!();
@@ -186,27 +197,29 @@ class _JsonViewState extends State<JsonView> {
                           ),
                         ),
                         const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: () => _saveEdit(provider),
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save'),
+                        ),
                       ],
-                      ElevatedButton.icon(
-                        onPressed: isEditing ? () => _saveEdit(provider) : null,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save'),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed:
-                            (!isEditing && !isOtherEditing)
-                                ? () => _updateView(provider)
-                                : null,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Update'),
-                      ),
+                      if (!isEditing) ...[
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed:
+                              (!isEditing && !isOtherEditing)
+                                  ? () => _updateView(provider)
+                                  : null,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Update'),
+                        ),
+                      ],
                     ],
                   )
                   : Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      if (!isEditing)
+                      if (!isEditing) ...[
                         ElevatedButton.icon(
                           onPressed:
                               isOtherEditing
@@ -215,6 +228,16 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.edit),
                           label: const Text('Edit'),
                         ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed:
+                              (!isEditing && !isOtherEditing)
+                                  ? () => _updateView(provider)
+                                  : null,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Update'),
+                        ),
+                      ],
                       if (isEditing) ...[
                         ElevatedButton.icon(
                           onPressed: () => _cancelEdit(provider),
@@ -225,21 +248,12 @@ class _JsonViewState extends State<JsonView> {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () => _saveEdit(provider),
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save'),
+                        ),
                       ],
-                      ElevatedButton.icon(
-                        onPressed: isEditing ? () => _saveEdit(provider) : null,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed:
-                            (!isEditing && !isOtherEditing)
-                                ? () => _updateView(provider)
-                                : null,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Update'),
-                      ),
                     ],
                   );
             },
