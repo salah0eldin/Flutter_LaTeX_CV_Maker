@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io' show Platform;
 import 'dart:io';
+import 'dart:html' as html;
+import 'dart:convert';
 import '../providers/cv_data_provider.dart';
 
 // =====================================
@@ -55,6 +57,24 @@ class _LatexViewState extends State<LatexView> {
           const SnackBar(
             content: Text('No content to save'),
             backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Web: Use AnchorElement to trigger download
+      if (identical(0, 0.0)) {
+        final bytes = utf8.encode(_controller.text);
+        final blob = html.Blob([bytes], 'text/x-tex');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        html.AnchorElement(href: url)
+          ..setAttribute('download', 'cv.tex')
+          ..click();
+        html.Url.revokeObjectUrl(url);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Exported LaTeX file (check your downloads)'),
+            backgroundColor: Colors.green,
           ),
         );
         return;

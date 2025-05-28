@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'dart:html' as html;
 import 'dart:io';
 import 'dart:convert';
 import '../views/json_view.dart';
@@ -39,8 +40,8 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   static const double minWidthForAllViews = 1000.0;
 
   // Store the width fractions for each view
-  double _jsonFraction = 0.36;
-  double _inputFraction = 0.36;
+  double _jsonFraction = 0.32;
+  double _inputFraction = 0.40;
   double _latexFraction = 0.25;
 
   static const String _tempFileName = 'cv_temp_autosave.json';
@@ -50,23 +51,64 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   // Save to History
   // =====================================
   Future<void> _saveToHistory() async {
-    if (kIsWeb) return; // Skip on web
-    try {
-      final jsonData = context.read<CVDataProvider>().jsonData;
+    final jsonData = context.read<CVDataProvider>().jsonData;
 
-      // Validate JSON
-      try {
-        json.decode(jsonData);
-      } catch (e) {
+    // Validate JSON
+    try {
+      json.decode(jsonData);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid JSON data'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (kIsWeb) {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          final controller = TextEditingController();
+          return AlertDialog(
+            title: const Text('Save to History'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Enter a name for your CV',
+                labelText: 'CV Name',
+              ),
+              autofocus: true,
+              onSubmitted:
+                  (value) => Navigator.of(context).pop(controller.text),
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              TextButton(
+                child: const Text('Save'),
+                onPressed: () => Navigator.of(context).pop(controller.text),
+              ),
+            ],
+          );
+        },
+      );
+      if (name != null && name.isNotEmpty) {
+        final sanitized = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+        final key = 'cv_history_$sanitized';
+        html.window.localStorage[key] = jsonData;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid JSON data'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Text('Saved to history as: $sanitized'),
+            backgroundColor: Colors.green,
           ),
         );
-        return;
       }
-
+      return;
+    }
+    try {
       // Get the application documents directory
       final directory = await getApplicationDocumentsDirectory();
       final historyDir = Directory('${directory.path}/cv_history');
@@ -180,26 +222,42 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   // =====================================
-  // Export JSON
+  // Export JSON (Web-compatible)
   // =====================================
   Future<void> _exportJson() async {
-    if (kIsWeb) return; // Skip on web
+    final jsonData = context.read<CVDataProvider>().jsonData;
+    // Validate JSON
     try {
-      final jsonData = context.read<CVDataProvider>().jsonData;
+      json.decode(jsonData);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid JSON data'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (kIsWeb) {
+      // Web: Use AnchorElement to trigger download
+      final bytes = utf8.encode(jsonData);
+      final blob = html.Blob([bytes], 'application/json');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor =
+          html.AnchorElement(href: url)
+            ..setAttribute('download', 'cv.json')
+            ..click();
+      html.Url.revokeObjectUrl(url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Exported JSON file (check your downloads)'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
 
-      // Validate JSON
-      try {
-        json.decode(jsonData);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid JSON data'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
+    try {
       // Get the documents directory as default save location
       final directory = await getApplicationDocumentsDirectory();
 
@@ -244,10 +302,100 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   // =====================================
-  // Load from History
+  // Load from History (Web-compatible, use localStorage)
   // =====================================
   Future<void> _loadFromHistory() async {
-    if (kIsWeb) return; // Skip on web
+    if (kIsWeb) {
+      final keys =
+          html.window.localStorage.keys
+              .where((k) => k.startsWith('cv_history_'))
+              .toList();
+      if (keys.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No saved CVs found'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      String? selectedKey;
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Load CV from History'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: keys.length,
+                itemBuilder: (context, index) {
+                  final key = keys[index];
+                  final name = key.replaceFirst('cv_history_', '');
+                  return ListTile(
+                    title: Text(name),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Delete',
+                      onPressed: () {
+                        html.window.localStorage.remove(key);
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Deleted "$name"'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      },
+                    ),
+                    onTap: () {
+                      selectedKey = key;
+                      Navigator.of(context).pop();
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          );
+        },
+      );
+      if (selectedKey != null) {
+        final jsonData = html.window.localStorage[selectedKey!];
+        if (jsonData != null) {
+          try {
+            json.decode(jsonData);
+            context.read<CVDataProvider>().updateJsonData(jsonData);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Loaded CV: ${selectedKey!.replaceFirst('cv_history_', '')}',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Invalid JSON file'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      }
+      return;
+    }
     try {
       final directory = await getApplicationDocumentsDirectory();
       final historyDir = Directory('${directory.path}/cv_history');
@@ -428,10 +576,45 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   // =====================================
-  // Import JSON
+  // Import JSON (Web-compatible)
   // =====================================
   Future<void> _importJson() async {
-    if (kIsWeb) return; // Skip on web
+    if (kIsWeb) {
+      // Web: Use file input dialog
+      final input = html.FileUploadInputElement();
+      input.accept = '.json';
+      input.click();
+      await input.onChange.first;
+      if (input.files != null && input.files!.isNotEmpty) {
+        final file = input.files!.first;
+        final reader = html.FileReader();
+        reader.readAsText(file);
+        await reader.onLoad.first;
+        final jsonData = reader.result as String;
+        try {
+          json.decode(jsonData);
+          context.read<CVDataProvider>().updateJsonData(jsonData);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Successfully imported: ${file.name}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid JSON file'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+      return;
+    }
     try {
       // Show file picker dialog
       FilePickerResult? result = await FilePicker.platform.pickFiles(

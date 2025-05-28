@@ -30,6 +30,7 @@ class _JsonViewState extends State<JsonView> {
   late TextEditingController _controller;
   late CodeController _codeController;
   String? _originalData;
+  bool _dirtyFromInput = false;
 
   // =====================================
   // initState & dispose
@@ -136,16 +137,27 @@ class _JsonViewState extends State<JsonView> {
     provider.setEditMode(EditMode.none);
     setState(() {
       _editing = false;
+      _dirtyFromInput = false;
     });
+    provider.setInputDirtyFromJson();
+    // Mark InputView as dirty so its Edit button is disabled
+    // (Assumes InputView checks provider.inputDirtyFromJson)
+    if (mounted) {
+      // Notify InputView to update its dirty state if needed
+      // (No direct call, but provider flag is set)
+    }
     if (widget.onSave != null) widget.onSave!();
   }
 
   void _updateView(CVDataProvider provider) {
-    if (!_editing) {
-      setState(() {
-        _controller.text = provider.jsonData;
-      });
+    // If input view is dirty, convert its tabs to JSON and update provider.jsonData
+    if (provider.jsonDirtyFromInput) {
+      provider.updateJsonData(provider.inputTabsJson);
+      provider.clearJsonDirtyFromInput();
     }
+    setState(() {
+      _controller.text = provider.jsonData;
+    });
   }
 
   // =====================================
@@ -157,6 +169,7 @@ class _JsonViewState extends State<JsonView> {
     final isEditing = provider.editMode == EditMode.json;
     final isOtherEditing = provider.editMode == EditMode.input;
     final jsonData = provider.jsonData;
+    final inputDirty = provider.jsonDirtyFromInput;
     // Only update the controller if not editing
     if (!isEditing && !_editing && _controller.text != jsonData) {
       _controller.value = TextEditingValue(
@@ -181,7 +194,7 @@ class _JsonViewState extends State<JsonView> {
                       if (!isEditing)
                         ElevatedButton.icon(
                           onPressed:
-                              isOtherEditing
+                              isOtherEditing || inputDirty
                                   ? null
                                   : () => _startEdit(provider),
                           icon: const Icon(Icons.edit),
@@ -222,7 +235,7 @@ class _JsonViewState extends State<JsonView> {
                       if (!isEditing) ...[
                         ElevatedButton.icon(
                           onPressed:
-                              isOtherEditing
+                              isOtherEditing || inputDirty
                                   ? null
                                   : () => _startEdit(provider),
                           icon: const Icon(Icons.edit),
@@ -271,6 +284,7 @@ class _JsonViewState extends State<JsonView> {
                   fontFamily: 'monospace',
                   fontSize: 14,
                   color: Theme.of(context).colorScheme.primary,
+                  height: 1.5, // Increased line spacing
                 ),
                 expands: true,
                 maxLines: null,
@@ -282,6 +296,7 @@ class _JsonViewState extends State<JsonView> {
                     color: Theme.of(
                       context,
                     ).colorScheme.secondary.withOpacity(0.7),
+                    height: 1.6, // Increased line spacing for line numbers
                   ),
                 ),
                 // No language param here, syntax highlighting is set via CodeController
@@ -307,6 +322,7 @@ class _JsonViewState extends State<JsonView> {
                       textStyle: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 14,
+                        height: 1.6, // Increased line spacing
                       ),
                     ),
                   ),

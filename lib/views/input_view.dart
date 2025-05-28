@@ -9,6 +9,7 @@
 // - Tabs: vertically aligned, show name, expandable, draggable for reordering
 // =====================================
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cv_data_provider.dart';
@@ -24,6 +25,7 @@ class _InputViewState extends State<InputView> {
   // List of tabs (header/body)
   final List<_InputTab> _tabs = [];
   List<_InputTab>? _tabsBackup; // Backup for cancel
+  bool _dirtyFromJson = false; // True if JSON was edited and not yet synced
 
   // Add new tab (header or body)
   void _addTab(String type) {
@@ -34,9 +36,24 @@ class _InputViewState extends State<InputView> {
         _tabs.add(_InputTab(type: 'body', name: 'Body Tab'));
       }
     });
+    _setDirty();
+  }
+
+  void _setDirty() {
+    setState(() {
+      _dirtyFromJson = false;
+    });
+  }
+
+  // Called by JsonView after save
+  void markDirtyFromJson() {
+    setState(() {
+      _dirtyFromJson = true;
+    });
   }
 
   void _startEdit(CVDataProvider provider) {
+    if (_dirtyFromJson) return; // Prevent editing if out of sync
     // Backup tabs before editing
     _tabsBackup = _tabs.map((t) => t.copy()).toList();
     provider.setEditMode(EditMode.input);
@@ -92,10 +109,42 @@ class _InputViewState extends State<InputView> {
   void _saveEdit(CVDataProvider provider) {
     _tabsBackup = null;
     provider.setEditMode(EditMode.none);
+    // After saving, mark JSON as dirty, but do NOT update provider.jsonData here
+    // Instead, update provider.inputTabsJson for JsonView to use on update
+    final order = _tabs.map((t) => t.name).toList();
+    final jsonMap = {'order': order};
+    final prettyJson = const JsonEncoder.withIndent('  ').convert(jsonMap);
+    provider.inputTabsJson = prettyJson;
+    provider.setJsonDirtyFromInput();
+    setState(() {
+      _dirtyFromJson = false;
+    });
+  }
+
+  // Helper to convert _tabs to JSON map
+  Map<String, dynamic> _tabsToJson() {
+    final order = _tabs.map((t) => t.name).toList();
+    return {'order': order};
   }
 
   void _updateView(CVDataProvider provider) {
-    // Implement update logic if needed
+    // Parse provider.jsonData and update _tabs
+    try {
+      final data = provider.parsedJsonData;
+      if (data is Map && data['order'] is List) {
+        final order = List<String>.from(data['order']);
+        setState(() {
+          _tabs.clear();
+          for (final name in order) {
+            _tabs.add(
+              _InputTab(type: name == 'Header' ? 'header' : 'body', name: name),
+            );
+          }
+          _dirtyFromJson = false;
+        });
+        provider.clearInputDirtyFromJson();
+      }
+    } catch (_) {}
   }
 
   @override
@@ -103,6 +152,7 @@ class _InputViewState extends State<InputView> {
     final provider = context.watch<CVDataProvider>();
     final isEditing = provider.editMode == EditMode.input;
     final isOtherEditing = provider.editMode == EditMode.json;
+    final isJsonDirty = provider.inputDirtyFromJson;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Stack(
@@ -119,7 +169,7 @@ class _InputViewState extends State<InputView> {
                           if (!isEditing)
                             ElevatedButton.icon(
                               onPressed:
-                                  isOtherEditing
+                                  isOtherEditing || isJsonDirty
                                       ? null
                                       : () => _startEdit(provider),
                               icon: const Icon(Icons.edit),
@@ -160,7 +210,7 @@ class _InputViewState extends State<InputView> {
                           if (!isEditing) ...[
                             ElevatedButton.icon(
                               onPressed:
-                                  isOtherEditing
+                                  isOtherEditing || isJsonDirty
                                       ? null
                                       : () => _startEdit(provider),
                               icon: const Icon(Icons.edit),
@@ -200,13 +250,17 @@ class _InputViewState extends State<InputView> {
               // Tabs list (vertical, draggable)
               Expanded(
                 child: ReorderableListView(
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) newIndex--;
-                      final item = _tabs.removeAt(oldIndex);
-                      _tabs.insert(newIndex, item);
-                    });
-                  },
+                  onReorder:
+                      isEditing
+                          ? (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex--;
+                              final item = _tabs.removeAt(oldIndex);
+                              _tabs.insert(newIndex, item);
+                            });
+                          }
+                          : (oldIndex, newIndex) {}, // No-op if not editing
+                  buildDefaultDragHandles: isEditing,
                   children: [
                     for (int i = 0; i < _tabs.length; i++)
                       _InputTabWidget(
@@ -276,6 +330,7 @@ class _InputTab {
   _InputTab copy() => _InputTab(type: type, name: name, expanded: expanded);
 
   @override
+  @override
   String toString() => 'type:$type|name:$name|expanded:$expanded';
 }
 
@@ -327,10 +382,16 @@ class _InputTabWidget extends StatelessWidget {
           if (tab.expanded)
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Text('Tab content for tab.name} (tab.type) goes here.'),
+              child: Text(
+                'Tab content for  ${tab.name} (${tab.type}) goes here.',
+              ),
             ),
         ],
       ),
     );
   }
 }
+
+// =====================================
+// END OF FILE
+// =====================================

@@ -22,6 +22,9 @@ class CVDataProvider extends ChangeNotifier {
   String _latexOutput = '';
   EditMode _editMode = EditMode.none;
   ThemeMode _themeMode = ThemeMode.system;
+  bool _jsonDirtyFromInput = false;
+  bool _inputDirtyFromJson = false;
+  String _inputTabsJson = '{}';
 
   // =====================================
   // Getters
@@ -31,6 +34,17 @@ class CVDataProvider extends ChangeNotifier {
   String get latexOutput => _latexOutput;
   EditMode get editMode => _editMode;
   ThemeMode get themeMode => _themeMode;
+  bool get jsonDirtyFromInput => _jsonDirtyFromInput;
+  bool get inputDirtyFromJson => _inputDirtyFromJson;
+  String get inputTabsJson => _inputTabsJson;
+
+  // =====================================
+  // Setters
+  // =====================================
+  set inputTabsJson(String value) {
+    _inputTabsJson = value;
+    notifyListeners();
+  }
 
   // =====================================
   // JSON Data Update
@@ -88,6 +102,26 @@ class CVDataProvider extends ChangeNotifier {
     } else {
       _themeMode = ThemeMode.light;
     }
+    notifyListeners();
+  }
+
+  void setJsonDirtyFromInput() {
+    _jsonDirtyFromInput = true;
+    notifyListeners();
+  }
+
+  void clearJsonDirtyFromInput() {
+    _jsonDirtyFromInput = false;
+    notifyListeners();
+  }
+
+  void setInputDirtyFromJson() {
+    _inputDirtyFromJson = true;
+    notifyListeners();
+  }
+
+  void clearInputDirtyFromJson() {
+    _inputDirtyFromJson = false;
     notifyListeners();
   }
 }
