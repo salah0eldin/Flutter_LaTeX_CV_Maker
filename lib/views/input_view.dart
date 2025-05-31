@@ -43,6 +43,9 @@ class _InputViewState extends State<InputView> {
     setState(() {
       _dirtyFromJson = false;
     });
+    // Save draft to provider
+    final provider = context.read<CVDataProvider>();
+    provider.inputTabsDraft = _tabs.map((t) => t.toMap()).toList();
   }
 
   // Called by JsonView after save
@@ -143,8 +146,22 @@ class _InputViewState extends State<InputView> {
           _dirtyFromJson = false;
         });
         provider.clearInputDirtyFromJson();
+        // Also update draft in provider
+        provider.inputTabsDraft = _tabs.map((t) => t.toMap()).toList();
       }
     } catch (_) {}
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final provider = context.read<CVDataProvider>();
+    // Restore draft tabs if available
+    final draft = provider.inputTabsDraft;
+    if (draft != null) {
+      _tabs.clear();
+      _tabs.addAll(draft.map((m) => _InputTab.fromMap(m)));
+    }
   }
 
   @override
@@ -174,6 +191,10 @@ class _InputViewState extends State<InputView> {
                                       : () => _startEdit(provider),
                               icon: const Icon(Icons.edit),
                               label: const Text('Edit'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           if (isEditing) ...[
                             ElevatedButton.icon(
@@ -182,6 +203,7 @@ class _InputViewState extends State<InputView> {
                               label: const Text('Cancel'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -189,6 +211,10 @@ class _InputViewState extends State<InputView> {
                               onPressed: () => _saveEdit(provider),
                               icon: const Icon(Icons.save),
                               label: const Text('Save'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           ],
                           if (!isEditing) ...[
@@ -200,6 +226,10 @@ class _InputViewState extends State<InputView> {
                                       : null,
                               icon: const Icon(Icons.refresh),
                               label: const Text('Update'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepOrange,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           ],
                         ],
@@ -215,6 +245,10 @@ class _InputViewState extends State<InputView> {
                                       : () => _startEdit(provider),
                               icon: const Icon(Icons.edit),
                               label: const Text('Edit'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
@@ -224,6 +258,10 @@ class _InputViewState extends State<InputView> {
                                       : null,
                               icon: const Icon(Icons.refresh),
                               label: const Text('Update'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepOrange,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           ],
                           if (isEditing) ...[
@@ -233,6 +271,7 @@ class _InputViewState extends State<InputView> {
                               label: const Text('Cancel'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -240,6 +279,10 @@ class _InputViewState extends State<InputView> {
                               onPressed: () => _saveEdit(provider),
                               icon: const Icon(Icons.save),
                               label: const Text('Save'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           ],
                         ],
@@ -258,6 +301,7 @@ class _InputViewState extends State<InputView> {
                               final item = _tabs.removeAt(oldIndex);
                               _tabs.insert(newIndex, item);
                             });
+                            _setDirty();
                           }
                           : (oldIndex, newIndex) {}, // No-op if not editing
                   buildDefaultDragHandles: isEditing,
@@ -268,11 +312,13 @@ class _InputViewState extends State<InputView> {
                         tab: _tabs[i],
                         onChanged: (tab) {
                           setState(() => _tabs[i] = tab);
+                          _setDirty();
                         },
                         onDelete: () {
                           setState(() {
                             _tabs.removeAt(i);
                           });
+                          _setDirty();
                         },
                       ),
                   ],
@@ -329,7 +375,17 @@ class _InputTab {
 
   _InputTab copy() => _InputTab(type: type, name: name, expanded: expanded);
 
-  @override
+  Map<String, dynamic> toMap() => {
+    'type': type,
+    'name': name,
+    'expanded': expanded,
+  };
+  static _InputTab fromMap(Map<String, dynamic> map) => _InputTab(
+    type: map['type'],
+    name: map['name'],
+    expanded: map['expanded'] ?? false,
+  );
+
   @override
   String toString() => 'type:$type|name:$name|expanded:$expanded';
 }

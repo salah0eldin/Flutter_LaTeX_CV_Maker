@@ -25,6 +25,7 @@ class CVDataProvider extends ChangeNotifier {
   bool _jsonDirtyFromInput = false;
   bool _inputDirtyFromJson = false;
   String _inputTabsJson = '{}';
+  List<Map<String, dynamic>>? _inputTabsDraft;
 
   // =====================================
   // Getters
@@ -37,12 +38,18 @@ class CVDataProvider extends ChangeNotifier {
   bool get jsonDirtyFromInput => _jsonDirtyFromInput;
   bool get inputDirtyFromJson => _inputDirtyFromJson;
   String get inputTabsJson => _inputTabsJson;
+  List<Map<String, dynamic>>? get inputTabsDraft => _inputTabsDraft;
 
   // =====================================
   // Setters
   // =====================================
   set inputTabsJson(String value) {
     _inputTabsJson = value;
+    notifyListeners();
+  }
+
+  set inputTabsDraft(List<Map<String, dynamic>>? value) {
+    _inputTabsDraft = value;
     notifyListeners();
   }
 

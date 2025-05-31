@@ -2,10 +2,6 @@
 // Imports and Dependencies
 // =====================================
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:html' as html;
-import 'dart:io';
 import 'dart:convert';
 import '../views/json_view.dart';
 import '../views/input_view.dart';
@@ -15,6 +11,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'cv_file_handler.dart';
+import 'cv_file_handler_stub.dart'
+    if (dart.library.html) 'main_screen_web.dart'
+    if (dart.library.io) 'main_screen_desktop.dart';
+
+// All web/desktop-specific logic will be delegated to platform-specific files using conditional imports.
 
 // =====================================
 // MainScreen Widget
@@ -44,16 +46,14 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   double _inputFraction = 0.40;
   double _latexFraction = 0.25;
 
-  static const String _tempFileName = 'cv_temp_autosave.json';
-  static const String _tempLatexFileName = 'cv_temp_autosave.tex';
+  final CVFileHandler _fileHandler =
+      getCVFileHandler(); // Use platform-specific implementation
 
   // =====================================
-  // Save to History
+  // Save to History (delegated)
   // =====================================
   Future<void> _saveToHistory() async {
     final jsonData = context.read<CVDataProvider>().jsonData;
-
-    // Validate JSON
     try {
       json.decode(jsonData);
     } catch (e) {
@@ -65,488 +65,75 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
       );
       return;
     }
-    if (kIsWeb) {
-      final name = await showDialog<String>(
-        context: context,
-        builder: (context) {
-          final controller = TextEditingController();
-          return AlertDialog(
-            title: const Text('Save to History'),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Enter a name for your CV',
-                labelText: 'CV Name',
-              ),
-              autofocus: true,
-              onSubmitted:
-                  (value) => Navigator.of(context).pop(controller.text),
-            ),
-            actions: [
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              TextButton(
-                child: const Text('Save'),
-                onPressed: () => Navigator.of(context).pop(controller.text),
-              ),
-            ],
-          );
-        },
-      );
-      if (name != null && name.isNotEmpty) {
-        final sanitized = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-        final key = 'cv_history_$sanitized';
-        html.window.localStorage[key] = jsonData;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved to history as: $sanitized'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-      return;
-    }
-    try {
-      // Get the application documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      final historyDir = Directory('${directory.path}/cv_history');
-
-      // Create history directory if it doesn't exist
-      if (!await historyDir.exists()) {
-        await historyDir.create(recursive: true);
-      }
-
-      // Show dialog to get file name
-      final TextEditingController nameController = TextEditingController();
-      final String? fileName = await showDialog<String>(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Save to History'),
-            content: TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                hintText: 'Enter a name for your CV',
-                labelText: 'CV Name',
-              ),
-              autofocus: true,
-              onSubmitted:
-                  (value) => Navigator.of(context).pop(nameController.text),
-            ),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              TextButton(
-                child: const Text('Save'),
-                onPressed: () => Navigator.of(context).pop(nameController.text),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (fileName != null && fileName.isNotEmpty) {
-        final sanitizedFileName = fileName.replaceAll(
-          RegExp(r'[^a-zA-Z0-9_-]'),
-          '_',
-        );
-        final file = File('${historyDir.path}/$sanitizedFileName.json');
-
-        // Check if file exists
-        if (await file.exists()) {
-          final bool? shouldOverwrite = await showDialog<bool>(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('File Already Exists'),
-                content: Text(
-                  'A CV named "$sanitizedFileName" already exists. Do you want to overwrite it?',
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('Cancel'),
-                    onPressed: () => Navigator.of(context).pop(false),
-                  ),
-                  TextButton(
-                    child: const Text('Overwrite'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    onPressed: () => Navigator.of(context).pop(true),
-                  ),
-                ],
-                // Allow Enter to confirm overwrite
-                actionsPadding: const EdgeInsets.symmetric(horizontal: 8),
-                contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                // Add a RawKeyboardListener to handle Enter key
-                // But AlertDialog doesn't support focus by default, so wrap in Shortcuts/Actions
-                // Instead, use a Focus widget and handle onKey
-                // But for simplicity, wrap the AlertDialog in a Focus widget:
-                // (see below)
-              );
-            },
-          );
-
-          if (shouldOverwrite != true) {
-            return;
-          }
-        }
-
-        await file.writeAsString(jsonData);
-        // Mark as saved to history
-        setState(() {
-          // _lastSavedJson = jsonData;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Saved to history as: $sanitizedFileName'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving to history: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    await _fileHandler.saveToHistory(context, jsonData);
   }
 
   // =====================================
-  // Export JSON (Web-compatible)
+  // Load from History (delegated)
   // =====================================
-  Future<void> _exportJson() async {
-    final jsonData = context.read<CVDataProvider>().jsonData;
-    // Validate JSON
-    try {
-      json.decode(jsonData);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid JSON data'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    if (kIsWeb) {
-      // Web: Use AnchorElement to trigger download
-      final bytes = utf8.encode(jsonData);
-      final blob = html.Blob([bytes], 'application/json');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor =
-          html.AnchorElement(href: url)
-            ..setAttribute('download', 'cv.json')
-            ..click();
-      html.Url.revokeObjectUrl(url);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Exported JSON file (check your downloads)'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      return;
-    }
-
-    try {
-      // Get the documents directory as default save location
-      final directory = await getApplicationDocumentsDirectory();
-
-      // Show save dialog
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Export JSON File',
-        fileName: 'cv.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        initialDirectory: directory.path,
-      );
-
-      if (outputFile != null) {
-        // Ensure the file has .json extension
-        if (!outputFile.endsWith('.json')) {
-          outputFile = '$outputFile.json';
-        }
-
-        final file = File(outputFile);
-        // Write as bytes using UTF8 encoding for Android/iOS compatibility
-        await file.writeAsBytes(utf8.encode(jsonData), flush: true);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Successfully exported to: \\${file.path}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting file: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // =====================================
-  // Load from History (Web-compatible, use localStorage)
-  // =====================================
-  Future<void> _loadFromHistory() async {
-    if (kIsWeb) {
-      final keys =
-          html.window.localStorage.keys
-              .where((k) => k.startsWith('cv_history_'))
-              .toList();
-      if (keys.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No saved CVs found'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-      String? selectedKey;
-      await showDialog<void>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Load CV from History'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: keys.length,
-                itemBuilder: (context, index) {
-                  final key = keys[index];
-                  final name = key.replaceFirst('cv_history_', '');
-                  return ListTile(
-                    title: Text(name),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      tooltip: 'Delete',
-                      onPressed: () {
-                        html.window.localStorage.remove(key);
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Deleted "$name"'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      },
-                    ),
-                    onTap: () {
-                      selectedKey = key;
+  Future<void> _loadHistory() async {
+    final keys = await _fileHandler.getHistoryKeys(context);
+    String? selectedKey;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Load CV from History'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: keys.length,
+              itemBuilder: (context, index) {
+                final key = keys[index];
+                final name = key.replaceFirst('cv_history_', '');
+                return ListTile(
+                  title: Text(name),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Delete',
+                    onPressed: () async {
+                      await _fileHandler.removeHistoryKey(context, key);
                       Navigator.of(context).pop();
-                    },
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          );
-        },
-      );
-      if (selectedKey != null) {
-        final jsonData = html.window.localStorage[selectedKey!];
-        if (jsonData != null) {
-          try {
-            json.decode(jsonData);
-            context.read<CVDataProvider>().updateJsonData(jsonData);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Loaded CV: ${selectedKey!.replaceFirst('cv_history_', '')}',
-                  ),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Invalid JSON file'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-        }
-      }
-      return;
-    }
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final historyDir = Directory('${directory.path}/cv_history');
-
-      if (!await historyDir.exists()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No saved CVs found'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-
-      final files = await historyDir.list().toList();
-      // Sort files by last modified descending (most recent first)
-      files.sort((a, b) {
-        final aStat = a.statSync();
-        final bStat = b.statSync();
-        return bStat.modified.compareTo(aStat.modified);
-      });
-      final jsonFiles =
-          files.where((file) => file.path.endsWith('.json')).toList();
-
-      if (jsonFiles.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No saved CVs found'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-
-      FileSystemEntity? selectedFile;
-      await showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          return StatefulBuilder(
-            builder: (context, setState) {
-              List<FileSystemEntity> localFiles = List.from(jsonFiles);
-              return AlertDialog(
-                title: const Text('Load CV from History'),
-                content: SizedBox(
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: localFiles.length,
-                    itemBuilder: (context, index) {
-                      final file = localFiles[index];
-                      final fileName = file.path
-                          .split('/')
-                          .last
-                          .replaceAll('.json', '');
-                      final modified = file.statSync().modified;
-                      final dateStr =
-                          '${modified.year.toString().padLeft(4, '0')}-${modified.month.toString().padLeft(2, '0')}-${modified.day.toString().padLeft(2, '0')} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}';
-                      return ListTile(
-                        title: Text(fileName),
-                        subtitle: Text('Saved: $dateStr'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: 'Delete',
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text('Delete CV'),
-                                    content: Text(
-                                      'Are you sure you want to delete "$fileName"?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        child: const Text('Cancel'),
-                                        onPressed:
-                                            () => Navigator.of(
-                                              context,
-                                            ).pop(false),
-                                      ),
-                                      TextButton(
-                                        child: const Text('Delete'),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: Colors.red,
-                                        ),
-                                        onPressed:
-                                            () =>
-                                                Navigator.of(context).pop(true),
-                                      ),
-                                    ],
-                                  ),
-                            );
-                            if (confirm == true) {
-                              try {
-                                await File(file.path).delete();
-                                setState(() {
-                                  localFiles.removeAt(index);
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Deleted "$fileName"'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Error deleting "$fileName": $e',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Deleted "$name"'),
+                          backgroundColor: Colors.red,
                         ),
-                        onTap: () {
-                          selectedFile = file;
-                          Navigator.of(context).pop();
-                        },
                       );
                     },
                   ),
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('Cancel'),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+                  onTap: () {
+                    selectedKey = key;
+                    Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+    if (selectedKey != null) {
+      final jsonData = await _fileHandler.loadHistoryItem(
+        context,
+        selectedKey!,
       );
-
-      if (selectedFile != null) {
-        final file = File(selectedFile!.path);
-        final jsonData = await file.readAsString();
-
-        // Validate JSON
+      if (jsonData != null) {
         try {
           json.decode(jsonData);
           context.read<CVDataProvider>().updateJsonData(jsonData);
-
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Loaded CV: \\${selectedFile!.path.split('/').last}',
+                  'Loaded CV: \\${selectedKey!.replaceFirst('cv_history_', '')}',
                 ),
                 backgroundColor: Colors.green,
               ),
@@ -562,15 +149,6 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
             );
           }
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading from history: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -579,176 +157,15 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   // Import JSON (Web-compatible)
   // =====================================
   Future<void> _importJson() async {
-    if (kIsWeb) {
-      // Web: Use file input dialog
-      final input = html.FileUploadInputElement();
-      input.accept = '.json';
-      input.click();
-      await input.onChange.first;
-      if (input.files != null && input.files!.isNotEmpty) {
-        final file = input.files!.first;
-        final reader = html.FileReader();
-        reader.readAsText(file);
-        await reader.onLoad.first;
-        final jsonData = reader.result as String;
-        try {
-          json.decode(jsonData);
-          context.read<CVDataProvider>().updateJsonData(jsonData);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Successfully imported: ${file.name}'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invalid JSON file'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-      return;
-    }
-    try {
-      // Show file picker dialog
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = File(result.files.first.path!);
-        final jsonData = await file.readAsString();
-
-        // Validate JSON
-        try {
-          json.decode(jsonData);
-          context.read<CVDataProvider>().updateJsonData(jsonData);
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Successfully imported: ${file.path.split('/').last}',
-                ),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invalid JSON file'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error importing file: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    await _fileHandler.importFromFile(context);
   }
 
   // =====================================
-  // Lifecycle: initState, dispose, onWindowClose
+  // Export JSON (Web-compatible)
   // =====================================
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = widget.initialIndex;
-    if (!kIsWeb) {
-      windowManager.addListener(this);
-      _loadTempData();
-      _loadTempLatexData();
-    }
-  }
-
-  @override
-  void dispose() {
-    if (!kIsWeb) {
-      windowManager.removeListener(this);
-    }
-    super.dispose();
-  }
-
-  @override
-  Future<bool> onWindowClose() async {
-    if (!kIsWeb) {
-      await _saveTempData();
-      await _saveTempLatexData();
-    }
-    return true;
-  }
-
-  // =====================================
-  // Temp Data Autosave/Autoload
-  // =====================================
-  Future<void> _loadTempData() async {
-    if (kIsWeb) return;
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempFileName');
-      if (await tempFile.exists()) {
-        final jsonData = await tempFile.readAsString();
-        // Validate JSON before loading
-        try {
-          json.decode(jsonData);
-          context.read<CVDataProvider>().updateJsonData(jsonData);
-        } catch (_) {
-          // Ignore invalid temp data
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveTempData() async {
-    if (kIsWeb) return;
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempFileName');
-      final jsonData = context.read<CVDataProvider>().jsonData;
-      await tempFile.writeAsString(jsonData);
-    } catch (_) {}
-  }
-
-  Future<void> _loadTempLatexData() async {
-    if (kIsWeb) return;
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempLatexFileName');
-      if (await tempFile.exists()) {
-        final latexData = await tempFile.readAsString();
-        if (latexData.isNotEmpty) {
-          context.read<CVDataProvider>().updateLatexOutput(latexData);
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveTempLatexData() async {
-    if (kIsWeb) return;
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempLatexFileName');
-      final latexData = context.read<CVDataProvider>().latexOutput;
-      await tempFile.writeAsString(latexData);
-    } catch (_) {}
+  Future<void> _exportJson() async {
+    final jsonData = context.read<CVDataProvider>().jsonData;
+    await _fileHandler.exportToFile(context, jsonData);
   }
 
   // =====================================
@@ -765,10 +182,22 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   // =====================================
+  // Init State
+  // =====================================
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
+
+  // =====================================
   // Build Methods
   // =====================================
   @override
   Widget build(BuildContext context) {
+    // Defensive: ensure _selectedIndex is always valid
+    if (_selectedIndex < 0 || _selectedIndex > 2) _selectedIndex = 1;
+
     final editMode = context.watch<CVDataProvider>().editMode;
     final isEditing = editMode != EditMode.none;
     return WillPopScope(
@@ -785,54 +214,179 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
             appBar: AppBar(
               title: const Text('CV Maker'),
               actions: [
-                IconButton(
-                  icon: Icon(
-                    Theme.of(context).brightness == Brightness.dark
-                        ? Icons.light_mode
-                        : Icons.dark_mode,
-                  ),
-                  tooltip: 'Switch Theme',
-                  onPressed: () {
-                    context.read<CVDataProvider>().toggleTheme();
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
-                    shouldShowAllViews ? Icons.view_agenda : Icons.view_column,
-                  ),
-                  tooltip:
-                      shouldShowAllViews
-                          ? 'Show Single View'
-                          : 'Show All Views',
-                  onPressed:
-                      canSwitch
-                          ? () {
-                            setState(() {
-                              _showAllViews = !_showAllViews;
-                            });
+                Builder(
+                  builder: (context) {
+                    if (totalWidth < 520) {
+                      // Small width: combine actions into dropdown
+                      return PopupMenuButton<String>(
+                        onSelected: (value) async {
+                          if (isEditing) return;
+                          switch (value) {
+                            case 'theme':
+                              context.read<CVDataProvider>().toggleTheme();
+                              break;
+                            case 'view':
+                              if (canSwitch)
+                                setState(() => _showAllViews = !_showAllViews);
+                              break;
+                            case 'import':
+                              await _importJson();
+                              break;
+                            case 'history':
+                              await _loadHistory();
+                              break;
+                            case 'save':
+                              await _saveToHistory();
+                              break;
+                            case 'export':
+                              await _exportJson();
+                              break;
                           }
-                          : null,
-                  color: canSwitch ? null : Colors.grey,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.file_download),
-                  onPressed: isEditing ? null : _importJson,
-                  tooltip: 'Import JSON',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.history),
-                  onPressed: isEditing ? null : _loadFromHistory,
-                  tooltip: 'Load from History',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.save),
-                  onPressed: isEditing ? null : _saveToHistory,
-                  tooltip: 'Save to History',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.file_upload),
-                  onPressed: isEditing ? null : _exportJson,
-                  tooltip: 'Export JSON',
+                        },
+                        itemBuilder:
+                            (context) => [
+                              PopupMenuItem(
+                                value: 'theme',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Icons.light_mode
+                                          : Icons.dark_mode,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('Switch Theme'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'view',
+                                enabled: canSwitch,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      shouldShowAllViews
+                                          ? Icons.view_agenda
+                                          : Icons.view_column,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      shouldShowAllViews
+                                          ? 'Show Single View'
+                                          : 'Show All Views',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'import',
+                                enabled: !isEditing,
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.file_download),
+                                    SizedBox(width: 8),
+                                    Text('Import JSON'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'history',
+                                enabled: !isEditing,
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.history),
+                                    SizedBox(width: 8),
+                                    Text('Load from History'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'save',
+                                enabled: !isEditing,
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.save),
+                                    SizedBox(width: 8),
+                                    Text('Save to History'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'export',
+                                enabled: !isEditing,
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.file_upload),
+                                    SizedBox(width: 8),
+                                    Text('Export JSON'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                        icon: const Icon(Icons.menu),
+                        tooltip: 'Actions',
+                      );
+                    } else {
+                      // Wide: show all actions as icons
+                      return Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Icons.light_mode
+                                  : Icons.dark_mode,
+                            ),
+                            tooltip: 'Switch Theme',
+                            onPressed: () {
+                              context.read<CVDataProvider>().toggleTheme();
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              shouldShowAllViews
+                                  ? Icons.view_agenda
+                                  : Icons.view_column,
+                            ),
+                            tooltip:
+                                shouldShowAllViews
+                                    ? 'Show Single View'
+                                    : 'Show All Views',
+                            onPressed:
+                                canSwitch
+                                    ? () {
+                                      setState(() {
+                                        _showAllViews = !_showAllViews;
+                                      });
+                                    }
+                                    : null,
+                            color: canSwitch ? null : Colors.grey,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.file_download),
+                            onPressed: isEditing ? null : _importJson,
+                            tooltip: 'Import JSON',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.history),
+                            onPressed: isEditing ? null : _loadHistory,
+                            tooltip: 'Load from History',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.save),
+                            onPressed: isEditing ? null : _saveToHistory,
+                            tooltip: 'Save to History',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.file_upload),
+                            onPressed: isEditing ? null : _exportJson,
+                            tooltip: 'Export JSON',
+                          ),
+                        ],
+                      );
+                    }
+                  },
                 ),
               ],
             ),

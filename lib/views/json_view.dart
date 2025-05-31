@@ -199,6 +199,10 @@ class _JsonViewState extends State<JsonView> {
                                   : () => _startEdit(provider),
                           icon: const Icon(Icons.edit),
                           label: const Text('Edit'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       if (isEditing) ...[
                         ElevatedButton.icon(
@@ -207,6 +211,7 @@ class _JsonViewState extends State<JsonView> {
                           label: const Text('Cancel'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -214,6 +219,10 @@ class _JsonViewState extends State<JsonView> {
                           onPressed: () => _saveEdit(provider),
                           icon: const Icon(Icons.save),
                           label: const Text('Save'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                       if (!isEditing) ...[
@@ -225,6 +234,10 @@ class _JsonViewState extends State<JsonView> {
                                   : null,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                     ],
@@ -240,6 +253,10 @@ class _JsonViewState extends State<JsonView> {
                                   : () => _startEdit(provider),
                           icon: const Icon(Icons.edit),
                           label: const Text('Edit'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
@@ -249,6 +266,10 @@ class _JsonViewState extends State<JsonView> {
                                   : null,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                       if (isEditing) ...[
@@ -258,6 +279,7 @@ class _JsonViewState extends State<JsonView> {
                           label: const Text('Cancel'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -265,6 +287,10 @@ class _JsonViewState extends State<JsonView> {
                           onPressed: () => _saveEdit(provider),
                           icon: const Icon(Icons.save),
                           label: const Text('Save'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                     ],

@@ -4,14 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io' show Platform;
-import 'dart:io';
-import 'dart:html' as html;
-import 'dart:convert';
 import '../providers/cv_data_provider.dart';
+import 'latex_exporter.dart';
+import 'latex_export_stub.dart'
+    if (dart.library.html) 'latex_export_web.dart'
+    if (dart.library.io) 'latex_export_desktop.dart';
 
 // =====================================
 // LatexView Widget
@@ -28,6 +26,7 @@ class LatexView extends StatefulWidget {
 // =====================================
 class _LatexViewState extends State<LatexView> {
   late TextEditingController _controller;
+  final LatexExporter _exporter = getLatexExporter();
 
   // =====================================
   // initState & dispose
@@ -61,65 +60,14 @@ class _LatexViewState extends State<LatexView> {
         );
         return;
       }
-
-      // Web: Use AnchorElement to trigger download
-      if (identical(0, 0.0)) {
-        final bytes = utf8.encode(_controller.text);
-        final blob = html.Blob([bytes], 'text/x-tex');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', 'cv.tex')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Exported LaTeX file (check your downloads)'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        return;
-      }
-
-      // Get the documents directory as default save location
-      final directory = await getApplicationDocumentsDirectory();
-
-      // Show save dialog
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save LaTeX File',
-        fileName: 'cv.tex',
-        type: FileType.custom,
-        allowedExtensions: ['tex'],
-        initialDirectory: directory.path,
-      );
-
-      if (outputFile != null) {
-        // Ensure the file has .tex extension
-        if (!outputFile.endsWith('.tex')) {
-          outputFile = '$outputFile.tex';
-        }
-
-        final file = File(outputFile);
-        // Write as bytes for compatibility with all platforms
-        await file.writeAsBytes(_controller.text.codeUnits);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Successfully saved to: ${file.path}'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
+      await _exporter.saveLatexFile(context, _controller.text);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving file: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to export LaTeX: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -128,7 +76,6 @@ class _LatexViewState extends State<LatexView> {
   // =====================================
   Future<void> _convertToPdf() async {
     try {
-      // First, ensure we have content to convert
       if (_controller.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -138,78 +85,14 @@ class _LatexViewState extends State<LatexView> {
         );
         return;
       }
-
-      // Get temporary directory
-      final tempDir = await getTemporaryDirectory();
-      final texFile = File('${tempDir.path}/cv.tex');
-      final pdfFile = File('${tempDir.path}/cv.pdf');
-
-      // Save LaTeX content to temporary file
-      await texFile.writeAsString(_controller.text);
-
-      // Check if pdflatex is installed
-      try {
-        final checkResult = await Process.run('which', ['pdflatex']);
-        if (checkResult.exitCode != 0) {
-          throw Exception(
-            'pdflatex is not installed. Please install TeX Live.',
-          );
-        }
-      } catch (e) {
-        throw Exception('pdflatex is not installed. Please install TeX Live.');
-      }
-
-      // Run pdflatex command
-      final result = await Process.run('pdflatex', [
-        '-interaction=nonstopmode',
-        '-output-directory=${tempDir.path}',
-        texFile.path,
-      ]);
-
-      if (result.exitCode == 0 && pdfFile.existsSync()) {
-        if (Platform.isLinux) {
-          // On Linux, save to user-specified location
-          String? outputFile = await FilePicker.platform.saveFile(
-            dialogTitle: 'Save PDF File',
-            fileName: 'cv.pdf',
-            type: FileType.custom,
-            allowedExtensions: ['pdf'],
-            initialDirectory: tempDir.path,
-          );
-          if (outputFile != null) {
-            if (!outputFile.endsWith('.pdf')) {
-              outputFile = '$outputFile.pdf';
-            }
-            await pdfFile.copy(outputFile);
-            // Open the PDF file after saving
-            try {
-              await Process.run('xdg-open', [outputFile]);
-            } catch (e) {
-              // Ignore errors if xdg-open is not available
-            }
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('PDF saved to: $outputFile'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          }
-        } else {
-          // On other platforms, share the PDF file
-          await Share.shareXFiles(
-            [XFile(pdfFile.path)],
-            text: 'My CV',
-            subject: 'CV in PDF format',
-          );
-        }
+      // Delegate to platform-specific implementation
+      if (_exporter is PdfCapableLatexExporter) {
+        await (_exporter as PdfCapableLatexExporter).convertToPdf(
+          context,
+          _controller.text,
+        );
       } else {
-        String errorMessage = 'Error generating PDF';
-        if (result.stderr.toString().isNotEmpty) {
-          errorMessage += ': ${result.stderr}';
-        }
-        throw Exception(errorMessage);
+        throw Exception('PDF export not supported on this platform.');
       }
     } catch (e) {
       if (mounted) {
@@ -256,12 +139,20 @@ class _LatexViewState extends State<LatexView> {
                         onPressed: isOtherEditing ? null : _saveLatexFile,
                         icon: const Icon(Icons.save),
                         label: const Text('Save LaTeX'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         onPressed: isOtherEditing ? null : _convertToPdf,
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('Convert to PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
@@ -275,6 +166,10 @@ class _LatexViewState extends State<LatexView> {
                                 },
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   )
@@ -285,12 +180,19 @@ class _LatexViewState extends State<LatexView> {
                         onPressed: isOtherEditing ? null : _saveLatexFile,
                         icon: const Icon(Icons.save),
                         label: const Text('Save LaTeX'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: isOtherEditing ? null : _convertToPdf,
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('Convert to PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
@@ -304,6 +206,9 @@ class _LatexViewState extends State<LatexView> {
                                 },
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                        ),
                       ),
                     ],
                   );
@@ -336,3 +241,5 @@ class _LatexViewState extends State<LatexView> {
     );
   }
 }
+
+// All web/desktop-specific LaTeX export logic will be delegated to platform-specific files using conditional imports.
