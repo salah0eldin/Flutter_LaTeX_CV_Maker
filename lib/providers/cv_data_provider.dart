@@ -26,6 +26,8 @@ class CVDataProvider extends ChangeNotifier {
   bool _inputDirtyFromJson = false;
   String _inputTabsJson = '{}';
   List<Map<String, dynamic>>? _inputTabsDraft;
+  bool _autosaveDataLoaded = false; // Track when autosave data is loaded
+  bool _jsonImported = false; // Track when JSON data has been imported
 
   // =====================================
   // Getters
@@ -39,6 +41,8 @@ class CVDataProvider extends ChangeNotifier {
   bool get inputDirtyFromJson => _inputDirtyFromJson;
   String get inputTabsJson => _inputTabsJson;
   List<Map<String, dynamic>>? get inputTabsDraft => _inputTabsDraft;
+  bool get autosaveDataLoaded => _autosaveDataLoaded;
+  bool get jsonImported => _jsonImported;
 
   // =====================================
   // Setters
@@ -63,6 +67,13 @@ class CVDataProvider extends ChangeNotifier {
     } catch (e) {
       _parsedJsonData = null; // Invalid JSON
     }
+    notifyListeners();
+  }
+
+  // Update JSON data from import (external source)
+  void updateJsonDataFromImport(String newData) {
+    updateJsonData(newData);
+    _jsonImported = true;
     notifyListeners();
   }
 
@@ -129,6 +140,16 @@ class CVDataProvider extends ChangeNotifier {
 
   void clearInputDirtyFromJson() {
     _inputDirtyFromJson = false;
+    notifyListeners();
+  }
+
+  void setAutosaveDataLoaded() {
+    _autosaveDataLoaded = true;
+    notifyListeners();
+  }
+
+  void clearJsonImported() {
+    _jsonImported = false;
     notifyListeners();
   }
 }

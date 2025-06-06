@@ -1,0 +1,32 @@
+{
+  "order": ["Personal Information", "Work Experience"],
+  "Personal Information": {
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phone": "123-456-7890",
+    "enabled": true,
+    "links": [
+      {
+        "text": "LinkedIn",
+        "url": "https://linkedin.com/in/johndoe",
+        "enabled": true
+      }
+    ]
+  },
+  "Work Experience": {
+    "title": "Software Engineer",
+    "content": [
+      {
+        "topic": "Senior Developer",
+        "secondary": "Tech Company",
+        "date": "2020-2024",
+        "description": [
+          "Developed scalable web applications",
+          "Led team of 5 developers"
+        ],
+        "enabled": true
+      }
+    ],
+    "enabled": true
+  }
+}

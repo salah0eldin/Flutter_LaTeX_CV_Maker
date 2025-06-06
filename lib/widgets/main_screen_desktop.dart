@@ -66,12 +66,6 @@ class CVFileHandlerDesktop implements CVFileHandler {
       final content = await file.readAsString();
       try {
         json.decode(content);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Imported JSON file!'),
-            backgroundColor: Colors.green,
-          ),
-        );
         return content;
       } catch (_) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,20 +136,22 @@ class CVFileHandlerDesktop implements CVFileHandler {
     return null;
   }
 
-  // Temp data: use temp directory for desktop
+  // Temp data: use app support directory for desktop (within app files)
   static const String _tempFileName = 'cv_temp_autosave.json';
   static const String _tempLatexFileName = 'cv_temp_autosave.tex';
 
   @override
   Future<void> loadTempData(BuildContext context) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempFileName');
+      final appDir = await getApplicationSupportDirectory();
+      final tempFile = File('${appDir.path}/$_tempFileName');
       if (await tempFile.exists()) {
         final jsonData = await tempFile.readAsString();
         try {
           json.decode(jsonData);
           context.read<CVDataProvider>().updateJsonData(jsonData);
+          context.read<CVDataProvider>().setAutosaveDataLoaded();
+          print('DEBUG: Loaded autosave data from: ${tempFile.path}');
         } catch (_) {}
       }
     } catch (_) {}
@@ -164,18 +160,24 @@ class CVFileHandlerDesktop implements CVFileHandler {
   @override
   Future<void> saveTempData(BuildContext context) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempFileName');
-      final jsonData = context.read<CVDataProvider>().jsonData;
+      final appDir = await getApplicationSupportDirectory();
+      final tempFile = File('${appDir.path}/$_tempFileName');
+      final provider = context.read<CVDataProvider>();
+      // Use inputTabsJson if available (latest from InputView), otherwise fall back to jsonData
+      final jsonData =
+          provider.inputTabsJson.isNotEmpty
+              ? provider.inputTabsJson
+              : provider.jsonData;
       await tempFile.writeAsString(jsonData);
+      print('DEBUG: Saved autosave data to: ${tempFile.path}');
     } catch (_) {}
   }
 
   @override
   Future<void> loadTempLatexData(BuildContext context) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempLatexFileName');
+      final appDir = await getApplicationSupportDirectory();
+      final tempFile = File('${appDir.path}/$_tempLatexFileName');
       if (await tempFile.exists()) {
         final latexData = await tempFile.readAsString();
         if (latexData.isNotEmpty) {
@@ -188,8 +190,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
   @override
   Future<void> saveTempLatexData(BuildContext context) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$_tempLatexFileName');
+      final appDir = await getApplicationSupportDirectory();
+      final tempFile = File('${appDir.path}/$_tempLatexFileName');
       final latexData = context.read<CVDataProvider>().latexOutput;
       await tempFile.writeAsString(latexData);
     } catch (_) {}

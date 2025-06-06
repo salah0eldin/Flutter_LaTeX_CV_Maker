@@ -140,7 +140,7 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.save),
                         label: const Text('Save LaTeX'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
+                          backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -150,7 +150,7 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('Convert to PDF'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
+                          backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -167,7 +167,7 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepOrange,
+                          backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -181,7 +181,7 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.save),
                         label: const Text('Save LaTeX'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
+                          backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -191,7 +191,8 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('Convert to PDF'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -207,7 +208,8 @@ class _LatexViewState extends State<LatexView> {
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepOrange,
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
                         ),
                       ),
                     ],

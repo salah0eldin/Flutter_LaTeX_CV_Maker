@@ -72,12 +72,7 @@ class CVFileHandlerWeb implements CVFileHandler {
     if (result != null) {
       try {
         json.decode(result);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Imported JSON file!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        // Success message now handled in main_screen.dart _importJson() method
       } catch (_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -137,13 +132,19 @@ class CVFileHandlerWeb implements CVFileHandler {
         json.decode(jsonData);
         // ignore: use_build_context_synchronously
         context.read<CVDataProvider>().updateJsonData(jsonData);
+        context.read<CVDataProvider>().setAutosaveDataLoaded();
       } catch (_) {}
     }
   }
 
   @override
   Future<void> saveTempData(BuildContext context) async {
-    final jsonData = context.read<CVDataProvider>().jsonData;
+    final provider = context.read<CVDataProvider>();
+    // Use inputTabsJson if available (latest from InputView), otherwise fall back to jsonData
+    final jsonData =
+        provider.inputTabsJson.isNotEmpty
+            ? provider.inputTabsJson
+            : provider.jsonData;
     html.window.localStorage[_tempFileName] = jsonData;
   }
 

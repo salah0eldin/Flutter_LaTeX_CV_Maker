@@ -128,7 +128,7 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
       if (jsonData != null) {
         try {
           json.decode(jsonData);
-          context.read<CVDataProvider>().updateJsonData(jsonData);
+          context.read<CVDataProvider>().updateJsonDataFromImport(jsonData);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -157,7 +157,30 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   // Import JSON (Web-compatible)
   // =====================================
   Future<void> _importJson() async {
-    await _fileHandler.importFromFile(context);
+    final jsonContent = await _fileHandler.importFromFile(context);
+    if (jsonContent != null) {
+      // Update provider with imported data (using import-specific method)
+      final provider = context.read<CVDataProvider>();
+      provider.updateJsonDataFromImport(jsonContent);
+
+      // Clear any existing draft data and dirty flags to start fresh
+      provider.inputTabsDraft = null;
+      provider.clearJsonDirtyFromInput();
+      provider.clearInputDirtyFromJson();
+
+      // Save to autosave
+      await _fileHandler.saveTempData(context);
+
+      // Show success message (moved from file handlers to here)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imported and loaded JSON data!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   // =====================================
@@ -188,6 +211,14 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    // Restore last state (draft) for all views
+    Future.microtask(() async {
+      final handler = _fileHandler;
+      // Restore JSON/input state
+      await handler.loadTempData(context);
+      // Restore LaTeX state
+      await handler.loadTempLatexData(context);
+    });
   }
 
   // =====================================

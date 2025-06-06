@@ -9,6 +9,8 @@ import 'package:code_text_field/code_text_field.dart';
 import 'package:highlight/languages/json.dart';
 import 'dart:convert';
 import '../providers/cv_data_provider.dart';
+import '../widgets/main_screen_desktop.dart'
+    if (dart.library.html) '../widgets/main_screen_web.dart';
 
 // =====================================
 // JsonView Widget
@@ -30,7 +32,6 @@ class _JsonViewState extends State<JsonView> {
   late TextEditingController _controller;
   late CodeController _codeController;
   String? _originalData;
-  bool _dirtyFromInput = false;
 
   // =====================================
   // initState & dispose
@@ -137,15 +138,12 @@ class _JsonViewState extends State<JsonView> {
     provider.setEditMode(EditMode.none);
     setState(() {
       _editing = false;
-      _dirtyFromInput = false;
     });
     provider.setInputDirtyFromJson();
+    // --- AUTOSAVE: Save temp file to disk after every save ---
+    final fileHandler = getCVFileHandler();
+    fileHandler.saveTempData(context);
     // Mark InputView as dirty so its Edit button is disabled
-    // (Assumes InputView checks provider.inputDirtyFromJson)
-    if (mounted) {
-      // Notify InputView to update its dirty state if needed
-      // (No direct call, but provider flag is set)
-    }
     if (widget.onSave != null) widget.onSave!();
   }
 
@@ -170,8 +168,12 @@ class _JsonViewState extends State<JsonView> {
     final isOtherEditing = provider.editMode == EditMode.input;
     final jsonData = provider.jsonData;
     final inputDirty = provider.jsonDirtyFromInput;
-    // Only update the controller if not editing
-    if (!isEditing && !_editing && _controller.text != jsonData) {
+    // Only update the controller if not editing AND not caused by InputView changes
+    // This prevents automatic synchronization - JsonView only updates when explicitly requested
+    if (!isEditing &&
+        !_editing &&
+        _controller.text != jsonData &&
+        !inputDirty) {
       _controller.value = TextEditingValue(
         text: jsonData,
         selection: TextSelection.collapsed(offset: jsonData.length),
@@ -186,7 +188,7 @@ class _JsonViewState extends State<JsonView> {
           // =====================================
           LayoutBuilder(
             builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 380;
+              final isNarrow = constraints.maxWidth < 300;
               return isNarrow
                   ? Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -200,7 +202,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.edit),
                           label: const Text('Edit'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -210,7 +212,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.cancel),
                           label: const Text('Cancel'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -220,7 +222,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.save),
                           label: const Text('Save'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -235,7 +237,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -254,7 +256,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.edit),
                           label: const Text('Edit'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -267,7 +269,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -278,7 +280,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.cancel),
                           label: const Text('Cancel'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -288,7 +290,7 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.save),
                           label: const Text('Save'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
+                            backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                           ),
                         ),
