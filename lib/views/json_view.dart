@@ -237,7 +237,10 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor:
+                                (!isEditing && !isOtherEditing)
+                                    ? Colors.blue
+                                    : Colors.grey,
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -269,7 +272,10 @@ class _JsonViewState extends State<JsonView> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Update'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor:
+                                (!isEditing && !isOtherEditing)
+                                    ? Colors.blue
+                                    : Colors.grey,
                             foregroundColor: Colors.white,
                           ),
                         ),

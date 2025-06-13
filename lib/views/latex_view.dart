@@ -113,6 +113,7 @@ class _LatexViewState extends State<LatexView> {
         provider.editMode == EditMode.json ||
         provider.editMode == EditMode.input;
     final providerLatex = provider.latexOutput;
+
     if (_controller.text != providerLatex) {
       _controller.value = TextEditingValue(
         text: providerLatex,
@@ -157,17 +158,17 @@ class _LatexViewState extends State<LatexView> {
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         onPressed:
-                            isOtherEditing
-                                ? null
-                                : () {
-                                  setState(
-                                    () {},
-                                  ); // Dummy update, replace with actual update logic if needed
-                                },
+                            !isOtherEditing
+                                ? () {
+                                  // TODO: Implement proper LaTeX generation from JSON
+                                  setState(() {}); // Placeholder for now
+                                }
+                                : null,
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor:
+                              !isOtherEditing ? Colors.blue : Colors.grey,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -198,17 +199,17 @@ class _LatexViewState extends State<LatexView> {
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed:
-                            isOtherEditing
-                                ? null
-                                : () {
-                                  setState(
-                                    () {},
-                                  ); // Dummy update, replace with actual update logic if needed
-                                },
+                            !isOtherEditing
+                                ? () {
+                                  // TODO: Implement proper LaTeX generation from JSON
+                                  setState(() {}); // Placeholder for now
+                                }
+                                : null,
                         icon: const Icon(Icons.refresh),
                         label: const Text('Update'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor:
+                              !isOtherEditing ? Colors.blue : Colors.grey,
                           foregroundColor: Colors.white,
                         ),
                       ),

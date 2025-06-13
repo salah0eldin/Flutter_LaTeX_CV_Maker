@@ -52,14 +52,14 @@ class _InputViewState extends State<InputView> {
             type: 'header',
             name: name,
             data: {
-              'name': {'value': '', 'enabled': true},
-              'phone': {'value': '', 'enabled': true},
-              'address': {'value': '', 'enabled': true},
-              'email': {'value': '', 'enabled': true},
+              'name': {'enabled': true, 'value': ''},
+              'phone': {'enabled': true, 'value': ''},
+              'address': {'enabled': true, 'value': ''},
+              'email': {'enabled': true, 'value': ''},
               'links':
                   <
                     Map<String, dynamic>
-                  >[], // Each: {'value': '', 'enabled': true}
+                  >[], // Each: {'enabled': true, 'display': '', 'url': ''}
             },
           ),
         );
@@ -71,11 +71,29 @@ class _InputViewState extends State<InputView> {
             data:
                 <
                   Map<String, dynamic>
-                >[], // Each: {'title': '', 'content': '', 'enabled': true}
+                >[], // Each: {'enabled': true, 'title': '', 'content': ''}
           ),
         );
       } else {
-        _tabs.add(_InputTab(type: 'body', name: name));
+        _tabs.add(
+          _InputTab(
+            type: 'body',
+            name: name,
+            data: {
+              'enabled': true,
+              'mainHeader': {'enabled': true, 'value': ''},
+              'extraInfo': {'enabled': true, 'value': ''},
+              'link': {'enabled': true, 'value': ''},
+              'date': {'enabled': true, 'value': ''},
+              'secondaryHeader': {'enabled': true, 'value': ''},
+              'location': {'enabled': true, 'value': ''},
+              'descriptions':
+                  <
+                    Map<String, dynamic>
+                  >[], // Each: {'enabled': true, 'value': ''}
+            },
+          ),
+        );
       }
     });
     _setDirty();
@@ -96,6 +114,233 @@ class _InputViewState extends State<InputView> {
   void _autosaveAfterChange() async {
     final fileHandler = getCVFileHandler();
     await fileHandler.saveTempData(context);
+  }
+
+  // Clear all tabs with confirmation
+  Future<void> _clearAllTabs() async {
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Clear All Tabs?'),
+            content: const Text(
+              'Are you sure you want to remove all tabs? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Clear All'),
+              ),
+            ],
+          ),
+    );
+
+    if (shouldClear == true) {
+      setState(() {
+        _tabs.clear();
+        _tabsDeleted = true;
+      });
+      _setDirty();
+    }
+  }
+
+  // Add default tabs with confirmation if tabs exist
+  Future<void> _addDefaultTabs() async {
+    bool shouldAdd = true;
+
+    if (_tabs.isNotEmpty) {
+      shouldAdd =
+          await showDialog<bool>(
+            context: context,
+            builder:
+                (context) => AlertDialog(
+                  title: const Text('Add Default Tabs?'),
+                  content: const Text(
+                    'This will add default tabs to your existing tabs. Continue?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+          ) ??
+          false;
+    }
+
+    if (shouldAdd) {
+      setState(() {
+        _tabsDeleted = false;
+
+        // Define default tabs
+        final defaultTabs = [
+          {'type': 'header', 'name': 'Header'},
+          {'type': 'body', 'name': 'Education'},
+          {'type': 'body', 'name': 'Work Experience'},
+          {'type': 'skills', 'name': 'Skills'},
+          {'type': 'body', 'name': 'Projects'},
+          {'type': 'body', 'name': 'Courses'},
+          {'type': 'body', 'name': 'Extracurricular Activities'},
+        ];
+
+        // Add tabs only if they don't already exist
+        for (final defaultTab in defaultTabs) {
+          final name = defaultTab['name']!;
+          final type = defaultTab['type']!;
+
+          // Check if tab with this name already exists
+          if (!_tabs.any((tab) => tab.name == name)) {
+            if (type == 'header') {
+              _tabs.add(
+                _InputTab(
+                  type: 'header',
+                  name: name,
+                  data: {
+                    'name': {'enabled': true, 'value': ''},
+                    'phone': {'enabled': true, 'value': ''},
+                    'address': {'enabled': true, 'value': ''},
+                    'email': {'enabled': true, 'value': ''},
+                    'links': <Map<String, dynamic>>[],
+                  },
+                ),
+              );
+            } else if (type == 'skills') {
+              _tabs.add(
+                _InputTab(
+                  type: 'skills',
+                  name: name,
+                  data: <Map<String, dynamic>>[],
+                ),
+              );
+            } else {
+              // Body tab with customized field enabled/disabled states
+              final bodyData = _getDefaultBodyTabData(name);
+              _tabs.add(_InputTab(type: 'body', name: name, data: bodyData));
+            }
+          }
+        }
+      });
+      _setDirty();
+    }
+  }
+
+  // Get customized field enabled/disabled states for default body tabs
+  Map<String, dynamic> _getDefaultBodyTabData(String tabName) {
+    // Default configuration: all fields enabled
+    final defaultConfig = {
+      'enabled': true,
+      'mainHeader': {'enabled': true, 'value': ''},
+      'extraInfo': {'enabled': true, 'value': ''},
+      'link': {'enabled': true, 'value': ''},
+      'date': {'enabled': true, 'value': ''},
+      'secondaryHeader': {'enabled': true, 'value': ''},
+      'location': {'enabled': true, 'value': ''},
+      'descriptions': <Map<String, dynamic>>[],
+    };
+
+    // Customize per tab - user can modify these as needed
+    switch (tabName) {
+      case 'Education':
+        return {
+          'enabled': true,
+          'mainHeader': {'enabled': true, 'value': ''}, // Degree/School name
+          'extraInfo': {
+            'enabled': false,
+            'value': '',
+          }, // Usually not needed for education
+          'link': {
+            'enabled': false,
+            'value': '',
+          }, // Usually not needed for education
+          'date': {'enabled': true, 'value': ''}, // Graduation date
+          'secondaryHeader': {'enabled': true, 'value': ''}, // Field of study
+          'location': {'enabled': true, 'value': ''}, // School location
+          'descriptions': <Map<String, dynamic>>[],
+        };
+
+      case 'Work Experience':
+        return {
+          'enabled': true,
+          'mainHeader': {'enabled': true, 'value': ''}, // Job title
+          'extraInfo': {
+            'enabled': false,
+            'value': '',
+          }, // Usually not needed for work
+          'link': {'enabled': true, 'value': ''}, // Company website
+          'date': {'enabled': true, 'value': ''}, // Employment period
+          'secondaryHeader': {'enabled': true, 'value': ''}, // Company name
+          'location': {'enabled': true, 'value': ''}, // Work location
+          'descriptions': <Map<String, dynamic>>[],
+        };
+
+      case 'Projects':
+        return {
+          'enabled': true,
+          'mainHeader': {'enabled': true, 'value': ''}, // Project name
+          'extraInfo': {'enabled': true, 'value': ''}, // Technologies used
+          'link': {'enabled': true, 'value': ''}, // Project link/repo
+          'date': {'enabled': true, 'value': ''}, // Project period
+          'secondaryHeader': {
+            'enabled': false,
+            'value': '',
+          }, // Usually not needed
+          'location': {
+            'enabled': false,
+            'value': '',
+          }, // Usually not needed for projects
+          'descriptions': <Map<String, dynamic>>[],
+        };
+
+      case 'Courses':
+        return {
+          'enabled': true,
+          'mainHeader': {'enabled': true, 'value': ''}, // Course name
+          'extraInfo': {'enabled': false, 'value': ''}, // Usually not needed
+          'link': {'enabled': true, 'value': ''}, // Course/certificate link
+          'date': {'enabled': true, 'value': ''}, // Course completion date
+          'secondaryHeader': {
+            'enabled': true,
+            'value': '',
+          }, // Institution/provider
+          'location': {
+            'enabled': false,
+            'value': '',
+          }, // Usually online or not relevant
+          'descriptions': <Map<String, dynamic>>[],
+        };
+
+      case 'Extracurricular Activities':
+        return {
+          'enabled': true,
+          'mainHeader': {'enabled': true, 'value': ''}, // Activity/role name
+          'extraInfo': {
+            'enabled': true,
+            'value': '',
+          }, // Skills gained or details
+          'link': {'enabled': false, 'value': ''}, // Usually not needed
+          'date': {'enabled': true, 'value': ''}, // Activity period
+          'secondaryHeader': {
+            'enabled': true,
+            'value': '',
+          }, // Organization name
+          'location': {'enabled': true, 'value': ''}, // Activity location
+          'descriptions': <Map<String, dynamic>>[],
+        };
+
+      default:
+        // For any other body tab names, use default configuration
+        return defaultConfig;
+    }
   }
 
   // Called by JsonView after save
@@ -169,48 +414,79 @@ class _InputViewState extends State<InputView> {
       if (tab.type == 'header') {
         final data = Map<String, dynamic>.from(tab.data ?? {});
         final headerSection = <String, dynamic>{};
+        // Place enabled attribute first
+        headerSection['enabled'] = data['enabled'] ?? true;
         for (final key in ['name', 'phone', 'address', 'email']) {
           headerSection[key] = {
-            'value': data[key]['value'],
             'enabled': data[key]['enabled'],
+            'value': data[key]['value'],
           };
         }
         headerSection['links'] =
             (data['links'] as List?)
                 ?.map(
                   (link) => {
+                    'enabled': link['enabled'],
                     'display': link['display'],
                     'url': link['url'],
-                    'enabled': link['enabled'],
                   },
                 )
                 .toList() ??
             [];
-        headerSection['enabled'] = data['enabled'] ?? true;
         headerSection['id'] = tab.id;
         jsonMap[tab.name] = headerSection;
       } else if (tab.type == 'skills') {
         final List skills = tab.data ?? [];
         jsonMap[tab.name] = {
+          'enabled': skills.isNotEmpty ? (skills[0]['enabled'] ?? true) : true,
           'skills':
               skills
                   .map(
                     (s) => {
+                      'enabled': s['enabled'],
                       'title': s['title'],
                       'content': s['content'],
-                      'enabled': s['enabled'],
                     },
                   )
                   .toList(),
-          'enabled': skills.isNotEmpty ? (skills[0]['enabled'] ?? true) : true,
           'id': tab.id,
         };
       } else if (tab.type == 'body') {
-        // Placeholder for body, can be extended later
-        jsonMap[tab.name] = {
-          'enabled': tab.data is Map ? (tab.data['enabled'] ?? true) : true,
-          'id': tab.id,
-        };
+        final data = Map<String, dynamic>.from(tab.data ?? {});
+        final bodySection = <String, dynamic>{};
+
+        // Place enabled attribute first
+        bodySection['enabled'] = data['enabled'] ?? true;
+
+        // Add all body fields
+        for (final key in [
+          'mainHeader',
+          'extraInfo',
+          'link',
+          'date',
+          'secondaryHeader',
+          'location',
+        ]) {
+          bodySection[key] = {
+            'enabled': data[key]?['enabled'] ?? true,
+            'value': data[key]?['value'] ?? '',
+          };
+        }
+
+        // Add descriptions array
+        bodySection['descriptions'] =
+            (data['descriptions'] as List?)
+                ?.map(
+                  (desc) => {
+                    'enabled': desc['enabled'] ?? true,
+                    'value': desc['value'] ?? '',
+                  },
+                )
+                .toList() ??
+            [];
+
+        bodySection['id'] = tab.id;
+        jsonMap[tab.name] = bodySection;
       }
     }
     final prettyJson = const JsonEncoder.withIndent('  ').convert(jsonMap);
@@ -284,12 +560,66 @@ class _InputViewState extends State<InputView> {
                 ),
               );
             } else {
-              // Body or unknown tab
+              // Body tab - check if it has the new structured format
+              final bodyData = <String, dynamic>{
+                'enabled': section['enabled'] ?? true,
+              };
+
+              // Check if it's the new structured format with mainHeader, extraInfo, etc.
+              if (section['mainHeader'] != null ||
+                  section['extraInfo'] != null ||
+                  section['skills'] != null ||
+                  section['link'] != null ||
+                  section['date'] != null ||
+                  section['secondaryHeader'] != null ||
+                  section['location'] != null ||
+                  section['descriptions'] != null) {
+                // New structured format
+                for (final key in [
+                  'mainHeader',
+                  'extraInfo',
+                  'link',
+                  'date',
+                  'secondaryHeader',
+                  'location',
+                ]) {
+                  bodyData[key] = {
+                    'enabled': section[key]?['enabled'] ?? true,
+                    'value': section[key]?['value'] ?? '',
+                  };
+                }
+
+                // Handle descriptions array
+                bodyData['descriptions'] =
+                    (section['descriptions'] as List?)
+                        ?.map(
+                          (desc) => {
+                            'enabled': desc['enabled'] ?? true,
+                            'value': desc['value'] ?? '',
+                          },
+                        )
+                        .toList() ??
+                    <Map<String, dynamic>>[];
+              } else {
+                // Legacy format or minimal format - initialize with default structure
+                for (final key in [
+                  'mainHeader',
+                  'extraInfo',
+                  'link',
+                  'date',
+                  'secondaryHeader',
+                  'location',
+                ]) {
+                  bodyData[key] = {'enabled': true, 'value': ''};
+                }
+                bodyData['descriptions'] = <Map<String, dynamic>>[];
+              }
+
               newTabs.add(
                 _InputTab(
                   type: 'body',
                   name: name,
-                  data: section,
+                  data: bodyData,
                   expanded: false,
                   id: section['id'],
                 ),
@@ -380,12 +710,66 @@ class _InputViewState extends State<InputView> {
                 ),
               );
             } else {
-              // Body or unknown tab
+              // Body tab - check if it has the new structured format
+              final bodyData = <String, dynamic>{
+                'enabled': section['enabled'] ?? true,
+              };
+
+              // Check if it's the new structured format with mainHeader, extraInfo, etc.
+              if (section['mainHeader'] != null ||
+                  section['extraInfo'] != null ||
+                  section['skills'] != null ||
+                  section['link'] != null ||
+                  section['date'] != null ||
+                  section['secondaryHeader'] != null ||
+                  section['location'] != null ||
+                  section['descriptions'] != null) {
+                // New structured format
+                for (final key in [
+                  'mainHeader',
+                  'extraInfo',
+                  'link',
+                  'date',
+                  'secondaryHeader',
+                  'location',
+                ]) {
+                  bodyData[key] = {
+                    'enabled': section[key]?['enabled'] ?? true,
+                    'value': section[key]?['value'] ?? '',
+                  };
+                }
+
+                // Handle descriptions array
+                bodyData['descriptions'] =
+                    (section['descriptions'] as List?)
+                        ?.map(
+                          (desc) => {
+                            'enabled': desc['enabled'] ?? true,
+                            'value': desc['value'] ?? '',
+                          },
+                        )
+                        .toList() ??
+                    <Map<String, dynamic>>[];
+              } else {
+                // Legacy format or minimal format - initialize with default structure
+                for (final key in [
+                  'mainHeader',
+                  'extraInfo',
+                  'link',
+                  'date',
+                  'secondaryHeader',
+                  'location',
+                ]) {
+                  bodyData[key] = {'enabled': true, 'value': ''};
+                }
+                bodyData['descriptions'] = <Map<String, dynamic>>[];
+              }
+
               newTabs.add(
                 _InputTab(
                   type: 'body',
                   name: name,
-                  data: section,
+                  data: bodyData,
                   expanded: false,
                   id: section['id'],
                 ),
@@ -446,7 +830,7 @@ class _InputViewState extends State<InputView> {
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 380;
+                  final isNarrow = constraints.maxWidth < 440;
                   return isNarrow
                       ? Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -484,6 +868,26 @@ class _InputViewState extends State<InputView> {
                                 foregroundColor: Colors.white,
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _clearAllTabs,
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _addDefaultTabs,
+                              icon: const Icon(Icons.auto_awesome),
+                              label: const Text('Default'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                           ],
                           if (!isEditing) ...[
                             const SizedBox(height: 8),
@@ -495,7 +899,10 @@ class _InputViewState extends State<InputView> {
                               icon: const Icon(Icons.refresh),
                               label: const Text('Update'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor:
+                                    (!isEditing && !isOtherEditing)
+                                        ? Colors.blue
+                                        : Colors.grey,
                                 foregroundColor: Colors.white,
                               ),
                             ),
@@ -527,7 +934,10 @@ class _InputViewState extends State<InputView> {
                               icon: const Icon(Icons.refresh),
                               label: const Text('Update'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor:
+                                    (!isEditing && !isOtherEditing)
+                                        ? Colors.blue
+                                        : Colors.grey,
                                 foregroundColor: Colors.white,
                               ),
                             ),
@@ -549,6 +959,26 @@ class _InputViewState extends State<InputView> {
                               label: const Text('Save'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: _clearAllTabs,
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: _addDefaultTabs,
+                              icon: const Icon(Icons.auto_awesome),
+                              label: const Text('Default'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
                               ),
                             ),
@@ -733,17 +1163,24 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
   final List<Map<String, TextEditingController>> _skillsControllers = [];
   final List<TextEditingController> _linkControllers = [];
 
+  // Body tab controllers
+  final Map<String, TextEditingController> _bodyControllers = {};
+  final List<TextEditingController> _bodyDescriptionControllers = [];
+
   // Persistent controller for tab name
   late final TextEditingController _tabNameController;
 
-  // Track the number of links/skills to avoid unnecessary controller recreation
+  // Track the number of links/skills/descriptions to avoid unnecessary controller recreation
   int _lastLinksCount = 0;
   int _lastSkillsCount = 0;
+  int _lastDescriptionsCount = 0;
 
   // Listeners for controllers
   final Map<String, VoidCallback> _headerListeners = {};
   final List<Map<String, VoidCallback>> _skillsListeners = [];
   final List<VoidCallback> _linkListeners = [];
+  final Map<String, VoidCallback> _bodyListeners = {};
+  final List<VoidCallback> _bodyDescriptionListeners = [];
 
   @override
   void initState() {
@@ -784,6 +1221,12 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
       m['content']?.dispose();
     }
     for (final c in _linkControllers) {
+      c.dispose();
+    }
+    for (final c in _bodyControllers.values) {
+      c.dispose();
+    }
+    for (final c in _bodyDescriptionControllers) {
       c.dispose();
     }
     super.dispose();
@@ -867,6 +1310,53 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
         }
         _lastSkillsCount = skills.length;
       }
+    } else if (tab.type == 'body') {
+      final data = Map<String, dynamic>.from(tab.data ?? {});
+
+      // Initialize main field controllers
+      for (final key in [
+        'mainHeader',
+        'extraInfo',
+        'link',
+        'date',
+        'secondaryHeader',
+        'location',
+      ]) {
+        if (force || !_bodyControllers.containsKey(key)) {
+          _bodyControllers[key]?.dispose();
+          _bodyControllers[key] = TextEditingController(
+            text: data[key]?['value'] ?? '',
+          );
+        }
+        // Add listener
+        _bodyListeners[key] = () {
+          data[key]['value'] = _bodyControllers[key]!.text;
+        };
+        _bodyControllers[key]!.addListener(_bodyListeners[key]!);
+      }
+
+      // Initialize description controllers
+      final descriptions = data['descriptions'] as List? ?? [];
+      if (force || descriptions.length != _lastDescriptionsCount) {
+        for (final c in _bodyDescriptionControllers) {
+          c.dispose();
+        }
+        _bodyDescriptionControllers.clear();
+        _bodyDescriptionListeners.clear();
+
+        for (final desc in descriptions) {
+          desc['value'] ??= '';
+          final ctrl = TextEditingController(text: desc['value']);
+          _bodyDescriptionControllers.add(ctrl);
+
+          final listener = () {
+            desc['value'] = ctrl.text;
+          };
+          _bodyDescriptionListeners.add(listener);
+          ctrl.addListener(listener);
+        }
+        _lastDescriptionsCount = descriptions.length;
+      }
     }
   }
 
@@ -888,6 +1378,18 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
         );
         _skillsControllers[i]['content']?.removeListener(
           _skillsListeners[i]['content']!,
+        );
+      }
+    }
+    for (final key in _bodyControllers.keys) {
+      if (_bodyListeners[key] != null) {
+        _bodyControllers[key]?.removeListener(_bodyListeners[key]!);
+      }
+    }
+    for (int i = 0; i < _bodyDescriptionControllers.length; i++) {
+      if (i < _bodyDescriptionListeners.length) {
+        _bodyDescriptionControllers[i].removeListener(
+          _bodyDescriptionListeners[i],
         );
       }
     }
@@ -1140,8 +1642,163 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
             ),
         ],
       );
+    } else if (tab.type == 'body') {
+      final data = Map<String, dynamic>.from(tab.data ?? {});
+      final descriptions = data['descriptions'] as List? ?? [];
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Main Header field
+          _checkboxTextField(
+            context,
+            label: 'Main Header',
+            controller: _bodyControllers['mainHeader']!,
+            enabled: data['mainHeader']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['mainHeader']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-mainHeader'),
+          ),
+          const SizedBox(height: 8),
+
+          // Extra Info field
+          _checkboxTextField(
+            context,
+            label: 'Extra Info',
+            controller: _bodyControllers['extraInfo']!,
+            enabled: data['extraInfo']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['extraInfo']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-extraInfo'),
+          ),
+          const SizedBox(height: 8),
+
+          // Link field
+          _checkboxTextField(
+            context,
+            label: 'Link',
+            controller: _bodyControllers['link']!,
+            enabled: data['link']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['link']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-link'),
+          ),
+          const SizedBox(height: 8),
+
+          // Date field
+          _checkboxTextField(
+            context,
+            label: 'Date',
+            controller: _bodyControllers['date']!,
+            enabled: data['date']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['date']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-date'),
+          ),
+          const SizedBox(height: 8),
+
+          // Secondary Header field
+          _checkboxTextField(
+            context,
+            label: 'Secondary Header',
+            controller: _bodyControllers['secondaryHeader']!,
+            enabled: data['secondaryHeader']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['secondaryHeader']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-secondaryHeader'),
+          ),
+          const SizedBox(height: 8),
+
+          // Location field
+          _checkboxTextField(
+            context,
+            label: 'Location',
+            controller: _bodyControllers['location']!,
+            enabled: data['location']?['enabled'] ?? true,
+            isEditing: isEditing,
+            onChanged: (_) {}, // No-op, handled by controller listener
+            onEnable: (val) {
+              data['location']['enabled'] = val;
+              widget.onChanged(tab.copy()..data = data);
+            },
+            fieldKey: ValueKey('body-location'),
+          ),
+          const SizedBox(height: 8),
+
+          // Descriptions section
+          Text('Descriptions', style: Theme.of(context).textTheme.titleMedium),
+          ...List.generate(descriptions.length, (i) {
+            final desc = descriptions[i];
+            final controller = _bodyDescriptionControllers[i];
+            return Row(
+              children: [
+                Checkbox(
+                  value: desc['enabled'] ?? true,
+                  onChanged:
+                      isEditing
+                          ? (val) {
+                            desc['enabled'] = val;
+                            widget.onChanged(tab.copy()..data = data);
+                          }
+                          : null,
+                ),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('body-description-$i'),
+                    controller: controller,
+                    enabled: isEditing,
+                    decoration: InputDecoration(
+                      labelText: 'Description ${i + 1}',
+                    ),
+                    onChanged: (_) {}, // No-op, handled by controller listener
+                  ),
+                ),
+                if (isEditing)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      descriptions.removeAt(i);
+                      widget.onChanged(tab.copy()..data = data);
+                      setState(() {}); // Only needed for add/remove
+                    },
+                  ),
+              ],
+            );
+          }),
+          if (isEditing)
+            TextButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Description'),
+              onPressed: () {
+                descriptions.add({'enabled': true, 'value': ''});
+                widget.onChanged(tab.copy()..data = data);
+                setState(() {}); // Only needed for add/remove
+              },
+            ),
+        ],
+      );
     } else {
-      return const Text('Tab content for Body goes here.');
+      return const Text('Unknown tab type.');
     }
   }
 
