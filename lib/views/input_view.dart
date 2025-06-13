@@ -263,8 +263,8 @@ class _InputViewState extends State<InputView> {
             'value': '',
           }, // Usually not needed for education
           'date': {'enabled': true, 'value': ''}, // Graduation date
-          'secondaryHeader': {'enabled': true, 'value': ''}, // Field of study
-          'location': {'enabled': true, 'value': ''}, // School location
+          'secondaryHeader': {'enabled': false, 'value': ''}, // Field of study
+          'location': {'enabled': false, 'value': ''}, // School location
           'descriptions': <Map<String, dynamic>>[],
         };
 
@@ -276,7 +276,7 @@ class _InputViewState extends State<InputView> {
             'enabled': false,
             'value': '',
           }, // Usually not needed for work
-          'link': {'enabled': true, 'value': ''}, // Company website
+          'link': {'enabled': false, 'value': ''}, // Company website
           'date': {'enabled': true, 'value': ''}, // Employment period
           'secondaryHeader': {'enabled': true, 'value': ''}, // Company name
           'location': {'enabled': true, 'value': ''}, // Work location
@@ -291,11 +291,11 @@ class _InputViewState extends State<InputView> {
           'link': {'enabled': true, 'value': ''}, // Project link/repo
           'date': {'enabled': true, 'value': ''}, // Project period
           'secondaryHeader': {
-            'enabled': false,
+            'enabled': true,
             'value': '',
           }, // Usually not needed
           'location': {
-            'enabled': false,
+            'enabled': true,
             'value': '',
           }, // Usually not needed for projects
           'descriptions': <Map<String, dynamic>>[],
@@ -306,7 +306,7 @@ class _InputViewState extends State<InputView> {
           'enabled': true,
           'mainHeader': {'enabled': true, 'value': ''}, // Course name
           'extraInfo': {'enabled': false, 'value': ''}, // Usually not needed
-          'link': {'enabled': true, 'value': ''}, // Course/certificate link
+          'link': {'enabled': false, 'value': ''}, // Course/certificate link
           'date': {'enabled': true, 'value': ''}, // Course completion date
           'secondaryHeader': {
             'enabled': true,
