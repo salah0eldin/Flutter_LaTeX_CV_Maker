@@ -81,16 +81,17 @@ class _InputViewState extends State<InputView> {
             name: name,
             data: {
               'enabled': true,
-              'mainHeader': {'enabled': true, 'value': ''},
-              'extraInfo': {'enabled': true, 'value': ''},
-              'link': {'enabled': true, 'value': ''},
-              'date': {'enabled': true, 'value': ''},
-              'secondaryHeader': {'enabled': true, 'value': ''},
-              'location': {'enabled': true, 'value': ''},
-              'descriptions':
-                  <
-                    Map<String, dynamic>
-                  >[], // Each: {'enabled': true, 'value': ''}
+              'instances': [
+                {
+                  'mainHeader': {'enabled': true, 'value': ''},
+                  'extraInfo': {'enabled': true, 'value': ''},
+                  'link': {'enabled': true, 'value': ''},
+                  'date': {'enabled': true, 'value': ''},
+                  'secondaryHeader': {'enabled': true, 'value': ''},
+                  'location': {'enabled': true, 'value': ''},
+                  'descriptions': <Map<String, dynamic>>[],
+                },
+              ],
             },
           ),
         );
@@ -236,111 +237,102 @@ class _InputViewState extends State<InputView> {
 
   // Get customized field enabled/disabled states for default body tabs
   Map<String, dynamic> _getDefaultBodyTabData(String tabName) {
-    // Default configuration: all fields enabled
-    final defaultConfig = {
-      'enabled': true,
-      'mainHeader': {'enabled': true, 'value': ''},
-      'extraInfo': {'enabled': true, 'value': ''},
-      'link': {'enabled': true, 'value': ''},
-      'date': {'enabled': true, 'value': ''},
-      'secondaryHeader': {'enabled': true, 'value': ''},
-      'location': {'enabled': true, 'value': ''},
-      'descriptions': <Map<String, dynamic>>[],
-    };
+    // Helper function to create a single instance with customized field states
+    Map<String, dynamic> createInstance(Map<String, bool> fieldStates) {
+      return {
+        'expanded': true, // New instances start expanded
+        'mainHeader': {
+          'enabled': fieldStates['mainHeader'] ?? true,
+          'value': '',
+        },
+        'extraInfo': {'enabled': fieldStates['extraInfo'] ?? true, 'value': ''},
+        'link': {'enabled': fieldStates['link'] ?? true, 'value': ''},
+        'date': {'enabled': fieldStates['date'] ?? true, 'value': ''},
+        'secondaryHeader': {
+          'enabled': fieldStates['secondaryHeader'] ?? true,
+          'value': '',
+        },
+        'location': {'enabled': fieldStates['location'] ?? true, 'value': ''},
+        'descriptions': <Map<String, dynamic>>[],
+      };
+    }
 
     // Customize per tab - user can modify these as needed
+    Map<String, bool> fieldStates;
     switch (tabName) {
       case 'Education':
-        return {
-          'enabled': true,
-          'mainHeader': {'enabled': true, 'value': ''}, // Degree/School name
-          'extraInfo': {
-            'enabled': false,
-            'value': '',
-          }, // Usually not needed for education
-          'link': {
-            'enabled': false,
-            'value': '',
-          }, // Usually not needed for education
-          'date': {'enabled': true, 'value': ''}, // Graduation date
-          'secondaryHeader': {'enabled': false, 'value': ''}, // Field of study
-          'location': {'enabled': false, 'value': ''}, // School location
-          'descriptions': <Map<String, dynamic>>[],
+        fieldStates = {
+          'mainHeader': true, // Degree/School name
+          'extraInfo': false, // Usually not needed for education
+          'link': false, // Usually not needed for education
+          'date': true, // Graduation date
+          'secondaryHeader': true, // Field of study
+          'location': true, // School location
         };
+        break;
 
       case 'Work Experience':
-        return {
-          'enabled': true,
-          'mainHeader': {'enabled': true, 'value': ''}, // Job title
-          'extraInfo': {
-            'enabled': false,
-            'value': '',
-          }, // Usually not needed for work
-          'link': {'enabled': false, 'value': ''}, // Company website
-          'date': {'enabled': true, 'value': ''}, // Employment period
-          'secondaryHeader': {'enabled': true, 'value': ''}, // Company name
-          'location': {'enabled': true, 'value': ''}, // Work location
-          'descriptions': <Map<String, dynamic>>[],
+        fieldStates = {
+          'mainHeader': true, // Job title
+          'extraInfo': false, // Usually not needed for work
+          'link': true, // Company website
+          'date': true, // Employment period
+          'secondaryHeader': true, // Company name
+          'location': true, // Work location
         };
+        break;
 
       case 'Projects':
-        return {
-          'enabled': true,
-          'mainHeader': {'enabled': true, 'value': ''}, // Project name
-          'extraInfo': {'enabled': true, 'value': ''}, // Technologies used
-          'link': {'enabled': true, 'value': ''}, // Project link/repo
-          'date': {'enabled': true, 'value': ''}, // Project period
-          'secondaryHeader': {
-            'enabled': true,
-            'value': '',
-          }, // Usually not needed
-          'location': {
-            'enabled': true,
-            'value': '',
-          }, // Usually not needed for projects
-          'descriptions': <Map<String, dynamic>>[],
+        fieldStates = {
+          'mainHeader': true, // Project name
+          'extraInfo': true, // Technologies used
+          'link': true, // Project link/repo
+          'date': true, // Project period
+          'secondaryHeader': false, // Usually not needed
+          'location': false, // Usually not needed for projects
         };
+        break;
 
       case 'Courses':
-        return {
-          'enabled': true,
-          'mainHeader': {'enabled': true, 'value': ''}, // Course name
-          'extraInfo': {'enabled': false, 'value': ''}, // Usually not needed
-          'link': {'enabled': false, 'value': ''}, // Course/certificate link
-          'date': {'enabled': true, 'value': ''}, // Course completion date
-          'secondaryHeader': {
-            'enabled': true,
-            'value': '',
-          }, // Institution/provider
-          'location': {
-            'enabled': false,
-            'value': '',
-          }, // Usually online or not relevant
-          'descriptions': <Map<String, dynamic>>[],
+        fieldStates = {
+          'mainHeader': true, // Course name
+          'extraInfo': false, // Usually not needed
+          'link': true, // Course/certificate link
+          'date': true, // Course completion date
+          'secondaryHeader': true, // Institution/provider
+          'location': false, // Usually online or not relevant
         };
+        break;
 
       case 'Extracurricular Activities':
-        return {
-          'enabled': true,
-          'mainHeader': {'enabled': true, 'value': ''}, // Activity/role name
-          'extraInfo': {
-            'enabled': true,
-            'value': '',
-          }, // Skills gained or details
-          'link': {'enabled': false, 'value': ''}, // Usually not needed
-          'date': {'enabled': true, 'value': ''}, // Activity period
-          'secondaryHeader': {
-            'enabled': true,
-            'value': '',
-          }, // Organization name
-          'location': {'enabled': true, 'value': ''}, // Activity location
-          'descriptions': <Map<String, dynamic>>[],
+        fieldStates = {
+          'mainHeader': true, // Activity/role name
+          'extraInfo': true, // Skills gained or details
+          'link': false, // Usually not needed
+          'date': true, // Activity period
+          'secondaryHeader': true, // Organization name
+          'location': true, // Activity location
         };
+        break;
 
       default:
-        // For any other body tab names, use default configuration
-        return defaultConfig;
+        // For any other body tab names, use default configuration (all enabled)
+        fieldStates = {
+          'mainHeader': true,
+          'extraInfo': true,
+          'link': true,
+          'date': true,
+          'secondaryHeader': true,
+          'location': true,
+        };
+        break;
     }
+
+    // Return body tab data with one initial instance
+    return {
+      'enabled': true,
+      'instances': [createInstance(fieldStates)],
+    };
   }
 
   // Called by JsonView after save
@@ -458,32 +450,41 @@ class _InputViewState extends State<InputView> {
         // Place enabled attribute first
         bodySection['enabled'] = data['enabled'] ?? true;
 
-        // Add all body fields
-        for (final key in [
-          'mainHeader',
-          'extraInfo',
-          'link',
-          'date',
-          'secondaryHeader',
-          'location',
-        ]) {
-          bodySection[key] = {
-            'enabled': data[key]?['enabled'] ?? true,
-            'value': data[key]?['value'] ?? '',
-          };
-        }
+        // Handle instances array
+        final instances = data['instances'] as List? ?? [];
+        bodySection['instances'] =
+            instances.map((instance) {
+              final instanceMap = <String, dynamic>{};
 
-        // Add descriptions array
-        bodySection['descriptions'] =
-            (data['descriptions'] as List?)
-                ?.map(
-                  (desc) => {
-                    'enabled': desc['enabled'] ?? true,
-                    'value': desc['value'] ?? '',
-                  },
-                )
-                .toList() ??
-            [];
+              // Add all body fields for this instance
+              for (final key in [
+                'mainHeader',
+                'extraInfo',
+                'link',
+                'date',
+                'secondaryHeader',
+                'location',
+              ]) {
+                instanceMap[key] = {
+                  'enabled': instance[key]?['enabled'] ?? true,
+                  'value': instance[key]?['value'] ?? '',
+                };
+              }
+
+              // Add descriptions array for this instance
+              instanceMap['descriptions'] =
+                  (instance['descriptions'] as List?)
+                      ?.map(
+                        (desc) => {
+                          'enabled': desc['enabled'] ?? true,
+                          'value': desc['value'] ?? '',
+                        },
+                      )
+                      .toList() ??
+                  [];
+
+              return instanceMap;
+            }).toList();
 
         bodySection['id'] = tab.id;
         jsonMap[tab.name] = bodySection;
@@ -1163,24 +1164,17 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
   final List<Map<String, TextEditingController>> _skillsControllers = [];
   final List<TextEditingController> _linkControllers = [];
 
-  // Body tab controllers
-  final Map<String, TextEditingController> _bodyControllers = {};
-  final List<TextEditingController> _bodyDescriptionControllers = [];
-
   // Persistent controller for tab name
   late final TextEditingController _tabNameController;
 
-  // Track the number of links/skills/descriptions to avoid unnecessary controller recreation
+  // Track the number of links/skills to avoid unnecessary controller recreation
   int _lastLinksCount = 0;
   int _lastSkillsCount = 0;
-  int _lastDescriptionsCount = 0;
 
   // Listeners for controllers
   final Map<String, VoidCallback> _headerListeners = {};
   final List<Map<String, VoidCallback>> _skillsListeners = [];
   final List<VoidCallback> _linkListeners = [];
-  final Map<String, VoidCallback> _bodyListeners = {};
-  final List<VoidCallback> _bodyDescriptionListeners = [];
 
   @override
   void initState() {
@@ -1221,12 +1215,6 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
       m['content']?.dispose();
     }
     for (final c in _linkControllers) {
-      c.dispose();
-    }
-    for (final c in _bodyControllers.values) {
-      c.dispose();
-    }
-    for (final c in _bodyDescriptionControllers) {
       c.dispose();
     }
     super.dispose();
@@ -1311,52 +1299,8 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
         _lastSkillsCount = skills.length;
       }
     } else if (tab.type == 'body') {
-      final data = Map<String, dynamic>.from(tab.data ?? {});
-
-      // Initialize main field controllers
-      for (final key in [
-        'mainHeader',
-        'extraInfo',
-        'link',
-        'date',
-        'secondaryHeader',
-        'location',
-      ]) {
-        if (force || !_bodyControllers.containsKey(key)) {
-          _bodyControllers[key]?.dispose();
-          _bodyControllers[key] = TextEditingController(
-            text: data[key]?['value'] ?? '',
-          );
-        }
-        // Add listener
-        _bodyListeners[key] = () {
-          data[key]['value'] = _bodyControllers[key]!.text;
-        };
-        _bodyControllers[key]!.addListener(_bodyListeners[key]!);
-      }
-
-      // Initialize description controllers
-      final descriptions = data['descriptions'] as List? ?? [];
-      if (force || descriptions.length != _lastDescriptionsCount) {
-        for (final c in _bodyDescriptionControllers) {
-          c.dispose();
-        }
-        _bodyDescriptionControllers.clear();
-        _bodyDescriptionListeners.clear();
-
-        for (final desc in descriptions) {
-          desc['value'] ??= '';
-          final ctrl = TextEditingController(text: desc['value']);
-          _bodyDescriptionControllers.add(ctrl);
-
-          final listener = () {
-            desc['value'] = ctrl.text;
-          };
-          _bodyDescriptionListeners.add(listener);
-          ctrl.addListener(listener);
-        }
-        _lastDescriptionsCount = descriptions.length;
-      }
+      // Body tabs now use instances structure with initialValue, no controllers needed
+      // This simplifies the controller management significantly
     }
   }
 
@@ -1378,18 +1322,6 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
         );
         _skillsControllers[i]['content']?.removeListener(
           _skillsListeners[i]['content']!,
-        );
-      }
-    }
-    for (final key in _bodyControllers.keys) {
-      if (_bodyListeners[key] != null) {
-        _bodyControllers[key]?.removeListener(_bodyListeners[key]!);
-      }
-    }
-    for (int i = 0; i < _bodyDescriptionControllers.length; i++) {
-      if (i < _bodyDescriptionListeners.length) {
-        _bodyDescriptionControllers[i].removeListener(
-          _bodyDescriptionListeners[i],
         );
       }
     }
@@ -1644,162 +1576,378 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
       );
     } else if (tab.type == 'body') {
       final data = Map<String, dynamic>.from(tab.data ?? {});
-      final descriptions = data['descriptions'] as List? ?? [];
+      final instances = data['instances'] as List? ?? [];
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Main Header field
-          _checkboxTextField(
-            context,
-            label: 'Main Header',
-            controller: _bodyControllers['mainHeader']!,
-            enabled: data['mainHeader']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['mainHeader']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-mainHeader'),
+          Text(
+            'Instances (${instances.length})',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
 
-          // Extra Info field
-          _checkboxTextField(
-            context,
-            label: 'Extra Info',
-            controller: _bodyControllers['extraInfo']!,
-            enabled: data['extraInfo']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['extraInfo']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-extraInfo'),
-          ),
-          const SizedBox(height: 8),
+          // Display all instances with drag-and-drop reordering
+          if (instances.isNotEmpty)
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: instances.length,
+              onReorder:
+                  isEditing
+                      ? (oldIndex, newIndex) {
+                        if (newIndex > oldIndex) newIndex--;
+                        final instance = instances.removeAt(oldIndex);
+                        instances.insert(newIndex, instance);
+                        widget.onChanged(tab.copy()..data = data);
+                        setState(
+                          () {},
+                        ); // Trigger rebuild to update instance numbers
+                      }
+                      : (oldIndex, newIndex) {}, // No-op if not editing
+              itemBuilder: (context, instanceIndex) {
+                final instance = instances[instanceIndex];
+                final descriptions = instance['descriptions'] as List? ?? [];
 
-          // Link field
-          _checkboxTextField(
-            context,
-            label: 'Link',
-            controller: _bodyControllers['link']!,
-            enabled: data['link']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['link']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-link'),
-          ),
-          const SizedBox(height: 8),
+                // Ensure backward compatibility: add 'expanded' field if missing
+                final isExpanded = instance['expanded'] ?? true;
 
-          // Date field
-          _checkboxTextField(
-            context,
-            label: 'Date',
-            controller: _bodyControllers['date']!,
-            enabled: data['date']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['date']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-date'),
-          ),
-          const SizedBox(height: 8),
+                // Get enhanced colors for better contrast, especially in dark mode
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final cardColor =
+                    isDark ? theme.colorScheme.surface : theme.cardColor;
+                final borderColor =
+                    isDark
+                        ? theme.colorScheme.outline.withOpacity(0.5)
+                        : theme.dividerColor;
 
-          // Secondary Header field
-          _checkboxTextField(
-            context,
-            label: 'Secondary Header',
-            controller: _bodyControllers['secondaryHeader']!,
-            enabled: data['secondaryHeader']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['secondaryHeader']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-secondaryHeader'),
-          ),
-          const SizedBox(height: 8),
-
-          // Location field
-          _checkboxTextField(
-            context,
-            label: 'Location',
-            controller: _bodyControllers['location']!,
-            enabled: data['location']?['enabled'] ?? true,
-            isEditing: isEditing,
-            onChanged: (_) {}, // No-op, handled by controller listener
-            onEnable: (val) {
-              data['location']['enabled'] = val;
-              widget.onChanged(tab.copy()..data = data);
-            },
-            fieldKey: ValueKey('body-location'),
-          ),
-          const SizedBox(height: 8),
-
-          // Descriptions section
-          Text('Descriptions', style: Theme.of(context).textTheme.titleMedium),
-          ...List.generate(descriptions.length, (i) {
-            final desc = descriptions[i];
-            final controller = _bodyDescriptionControllers[i];
-            return Row(
-              children: [
-                Checkbox(
-                  value: desc['enabled'] ?? true,
-                  onChanged:
-                      isEditing
-                          ? (val) {
-                            desc['enabled'] = val;
-                            widget.onChanged(tab.copy()..data = data);
-                          }
-                          : null,
-                ),
-                Expanded(
-                  child: TextFormField(
-                    key: ValueKey('body-description-$i'),
-                    controller: controller,
-                    enabled: isEditing,
-                    decoration: InputDecoration(
-                      labelText: 'Description ${i + 1}',
+                return Card(
+                  key: ValueKey(
+                    'body-instance-$instanceIndex-${instance.hashCode}',
+                  ),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  color: cardColor,
+                  elevation: isDark ? 4 : 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: borderColor,
+                      width: isDark ? 1.5 : 1.0,
                     ),
-                    onChanged: (_) {}, // No-op, handled by controller listener
                   ),
-                ),
-                if (isEditing)
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      descriptions.removeAt(i);
-                      widget.onChanged(tab.copy()..data = data);
-                      setState(() {}); // Only needed for add/remove
-                    },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Instance header with expand/collapse, drag handle and delete button
+                        Row(
+                          children: [
+                            if (isEditing && instances.length > 1)
+                              Icon(Icons.drag_handle, color: Colors.grey[600]),
+                            if (isEditing && instances.length > 1)
+                              const SizedBox(width: 8),
+                            // Expand/collapse button
+                            InkWell(
+                              onTap: () {
+                                instance['expanded'] = !isExpanded;
+                                widget.onChanged(tab.copy()..data = data);
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isExpanded
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Instance ${instanceIndex + 1}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (isEditing && instances.length > 1)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () {
+                                  instances.removeAt(instanceIndex);
+                                  widget.onChanged(tab.copy()..data = data);
+                                  setState(() {}); // Only needed for add/remove
+                                },
+                              ),
+                          ],
+                        ),
+
+                        // Collapsible content
+                        if (isExpanded) ...[
+                          const SizedBox(height: 16),
+
+                          // Main Header field
+                          _buildInstanceField(
+                            context,
+                            label: 'Main Header',
+                            instance: instance,
+                            fieldKey: 'mainHeader',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Extra Info field
+                          _buildInstanceField(
+                            context,
+                            label: 'Extra Info',
+                            instance: instance,
+                            fieldKey: 'extraInfo',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Link field
+                          _buildInstanceField(
+                            context,
+                            label: 'Link',
+                            instance: instance,
+                            fieldKey: 'link',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Date field
+                          _buildInstanceField(
+                            context,
+                            label: 'Date',
+                            instance: instance,
+                            fieldKey: 'date',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Secondary Header field
+                          _buildInstanceField(
+                            context,
+                            label: 'Secondary Header',
+                            instance: instance,
+                            fieldKey: 'secondaryHeader',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Location field
+                          _buildInstanceField(
+                            context,
+                            label: 'Location',
+                            instance: instance,
+                            fieldKey: 'location',
+                            instanceIndex: instanceIndex,
+                            isEditing: isEditing,
+                            onChanged:
+                                () => widget.onChanged(tab.copy()..data = data),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Descriptions section
+                          Text(
+                            'Descriptions',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          ...List.generate(descriptions.length, (i) {
+                            final desc = descriptions[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: desc['enabled'] ?? true,
+                                    onChanged:
+                                        isEditing
+                                            ? (val) {
+                                              desc['enabled'] = val;
+                                              widget.onChanged(
+                                                tab.copy()..data = data,
+                                              );
+                                            }
+                                            : null,
+                                  ),
+                                  Expanded(
+                                    child: TextFormField(
+                                      key: ValueKey(
+                                        'body-description-$instanceIndex-$i',
+                                      ),
+                                      initialValue: desc['value'] ?? '',
+                                      enabled: isEditing,
+                                      decoration: InputDecoration(
+                                        labelText: 'Description ${i + 1}',
+                                        border: const OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        desc['value'] = value;
+                                      },
+                                    ),
+                                  ),
+                                  if (isEditing)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () {
+                                        descriptions.removeAt(i);
+                                        widget.onChanged(
+                                          tab.copy()..data = data,
+                                        );
+                                        setState(
+                                          () {},
+                                        ); // Only needed for add/remove
+                                      },
+                                    ),
+                                ],
+                              ),
+                            );
+                          }),
+                          if (isEditing)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Description'),
+                                onPressed: () {
+                                  descriptions.add({
+                                    'enabled': true,
+                                    'value': '',
+                                  });
+                                  widget.onChanged(tab.copy()..data = data);
+                                  setState(() {}); // Only needed for add/remove
+                                },
+                              ),
+                            ),
+                        ], // Close the if (isExpanded) conditional content
+                      ],
+                    ),
                   ),
-              ],
-            );
-          }),
-          if (isEditing)
-            TextButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Description'),
-              onPressed: () {
-                descriptions.add({'enabled': true, 'value': ''});
-                widget.onChanged(tab.copy()..data = data);
-                setState(() {}); // Only needed for add/remove
+                );
               },
+            ),
+
+          // Add instance button
+          if (isEditing)
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  // Create a new instance with default field states based on the first instance
+                  final firstInstance =
+                      instances.isNotEmpty ? instances[0] : null;
+                  final newInstance = <String, dynamic>{
+                    'expanded': true, // New instances start expanded
+                  };
+
+                  for (final key in [
+                    'mainHeader',
+                    'extraInfo',
+                    'link',
+                    'date',
+                    'secondaryHeader',
+                    'location',
+                  ]) {
+                    newInstance[key] = {
+                      'enabled': firstInstance?[key]?['enabled'] ?? true,
+                      'value': '',
+                    };
+                  }
+                  newInstance['descriptions'] = <Map<String, dynamic>>[];
+
+                  instances.add(newInstance);
+                  widget.onChanged(tab.copy()..data = data);
+                  setState(() {}); // Only needed for add/remove
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Instance'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ),
         ],
       );
     } else {
       return const Text('Unknown tab type.');
     }
+  }
+
+  // Helper method to build instance fields
+  Widget _buildInstanceField(
+    BuildContext context, {
+    required String label,
+    required Map<String, dynamic> instance,
+    required String fieldKey,
+    required int instanceIndex,
+    required bool isEditing,
+    required VoidCallback onChanged,
+  }) {
+    final fieldData = instance[fieldKey] ?? {'enabled': true, 'value': ''};
+
+    return Row(
+      children: [
+        Checkbox(
+          value: fieldData['enabled'] ?? true,
+          onChanged:
+              isEditing
+                  ? (val) {
+                    fieldData['enabled'] = val;
+                    onChanged();
+                  }
+                  : null,
+        ),
+        Expanded(
+          child: TextFormField(
+            key: ValueKey('body-$fieldKey-$instanceIndex'),
+            initialValue: fieldData['value'] ?? '',
+            enabled: isEditing,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (value) {
+              fieldData['value'] = value;
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _checkboxTextField(
