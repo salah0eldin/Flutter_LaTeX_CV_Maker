@@ -6,7 +6,9 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/cv_data_provider.dart';
 import 'cv_file_handler.dart';
 
@@ -82,24 +84,57 @@ class CVFileHandlerDesktop implements CVFileHandler {
 
   @override
   Future<void> exportToFile(BuildContext context, String jsonData) async {
-    final directory = await getApplicationDocumentsDirectory();
-    String? outputFile = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save JSON File',
-      fileName: 'cv.json',
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      initialDirectory: directory.path,
-    );
-    if (outputFile != null) {
-      if (!outputFile.endsWith('.json')) {
-        outputFile = '$outputFile.json';
+    try {
+      // Check if we're on mobile (Android/iOS) vs desktop
+      if (Platform.isAndroid || Platform.isIOS) {
+        // Use share functionality for mobile
+        final directory = await getTemporaryDirectory();
+        final file = File('${directory.path}/cv_export.json');
+        await file.writeAsString(jsonData);
+
+        final result = await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'CV Data Export',
+          subject: 'CV Export',
+        );
+
+        if (result.status == ShareResultStatus.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('CV exported successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Use file picker for desktop
+        final directory = await getApplicationDocumentsDirectory();
+        String? outputFile = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save JSON File',
+          fileName: 'cv.json',
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          initialDirectory: directory.path,
+        );
+        if (outputFile != null) {
+          if (!outputFile.endsWith('.json')) {
+            outputFile = '$outputFile.json';
+          }
+          final file = File(outputFile);
+          await file.writeAsString(jsonData);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Exported JSON file!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
-      final file = File(outputFile);
-      await file.writeAsString(jsonData);
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Exported JSON file!'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Text('Failed to export JSON: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -109,10 +144,26 @@ class CVFileHandlerDesktop implements CVFileHandler {
   Future<List<String>> getHistoryKeys(BuildContext context) async {
     final directory = await getApplicationDocumentsDirectory();
     final files = directory.listSync().whereType<File>();
-    return files
-        .where(
-          (f) => f.path.contains('cv_history_') && f.path.endsWith('.json'),
-        )
+    final historyFiles =
+        files
+            .where(
+              (f) => f.path.contains('cv_history_') && f.path.endsWith('.json'),
+            )
+            .toList();
+
+    // Sort by file modification time (newest first)
+    historyFiles.sort((a, b) {
+      try {
+        final aTime = a.lastModifiedSync();
+        final bTime = b.lastModifiedSync();
+        return bTime.compareTo(aTime); // Newest first (larger timestamp first)
+      } catch (_) {
+        // Fallback to reverse alphabetical sort if file times can't be read
+        return b.path.compareTo(a.path);
+      }
+    });
+
+    return historyFiles
         .map((f) => f.path.split('/').last.replaceAll('.json', ''))
         .toList();
   }
@@ -138,7 +189,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
 
   // Temp data: use app support directory for desktop (within app files)
   static const String _tempFileName = 'cv_temp_autosave.json';
-  static const String _tempLatexFileName = 'cv_temp_autosave.tex';
+  static const String _tempPdfFileName = 'cv_temp_autosave.pdf';
+  static const String _tempPdfMetaFileName = 'cv_temp_autosave_pdf.meta';
 
   @override
   Future<void> loadTempData(BuildContext context) async {
@@ -174,27 +226,58 @@ class CVFileHandlerDesktop implements CVFileHandler {
   }
 
   @override
-  Future<void> loadTempLatexData(BuildContext context) async {
+  Future<void> loadTempPdfData(BuildContext context) async {
     try {
       final appDir = await getApplicationSupportDirectory();
-      final tempFile = File('${appDir.path}/$_tempLatexFileName');
-      if (await tempFile.exists()) {
-        final latexData = await tempFile.readAsString();
-        if (latexData.isNotEmpty) {
-          context.read<CVDataProvider>().updateLatexOutput(latexData);
+      final tempPdfFile = File('${appDir.path}/$_tempPdfFileName');
+      final tempMetaFile = File('${appDir.path}/$_tempPdfMetaFileName');
+
+      if (await tempPdfFile.exists() && await tempMetaFile.exists()) {
+        final pdfBytes = await tempPdfFile.readAsBytes();
+        final metaData = await tempMetaFile.readAsString();
+        final isTemplate = metaData.trim() == 'template';
+
+        if (pdfBytes.isNotEmpty) {
+          context.read<CVDataProvider>().updateTempPdfData(
+            pdfBytes,
+            isTemplate,
+          );
+          debugPrint(
+            'DEBUG: Loaded temp PDF data from: ${tempPdfFile.path} (isTemplate: $isTemplate)',
+          );
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('DEBUG: Error loading temp PDF data: $e');
+    }
   }
 
   @override
-  Future<void> saveTempLatexData(BuildContext context) async {
+  Future<void> saveTempPdfData(
+    BuildContext context,
+    Uint8List? pdfBytes,
+    bool isTemplate,
+  ) async {
     try {
       final appDir = await getApplicationSupportDirectory();
-      final tempFile = File('${appDir.path}/$_tempLatexFileName');
-      final latexData = context.read<CVDataProvider>().latexOutput;
-      await tempFile.writeAsString(latexData);
-    } catch (_) {}
+      final tempPdfFile = File('${appDir.path}/$_tempPdfFileName');
+      final tempMetaFile = File('${appDir.path}/$_tempPdfMetaFileName');
+
+      if (pdfBytes != null && pdfBytes.isNotEmpty) {
+        await tempPdfFile.writeAsBytes(pdfBytes);
+        await tempMetaFile.writeAsString(isTemplate ? 'template' : 'generated');
+        debugPrint(
+          'DEBUG: Saved temp PDF data to: ${tempPdfFile.path} (isTemplate: $isTemplate)',
+        );
+      } else {
+        // Delete temp files if no PDF data
+        if (await tempPdfFile.exists()) await tempPdfFile.delete();
+        if (await tempMetaFile.exists()) await tempMetaFile.delete();
+        debugPrint('DEBUG: Deleted temp PDF files (no data to save)');
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error saving temp PDF data: $e');
+    }
   }
 }
 

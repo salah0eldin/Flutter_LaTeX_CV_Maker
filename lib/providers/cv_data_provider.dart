@@ -19,7 +19,6 @@ class CVDataProvider extends ChangeNotifier {
   // =====================================
   String _jsonData = '{}';
   dynamic _parsedJsonData = {};
-  String _latexOutput = '';
   EditMode _editMode = EditMode.none;
   ThemeMode _themeMode = ThemeMode.system;
   bool _jsonDirtyFromInput = false;
@@ -29,12 +28,15 @@ class CVDataProvider extends ChangeNotifier {
   bool _autosaveDataLoaded = false; // Track when autosave data is loaded
   bool _jsonImported = false; // Track when JSON data has been imported
 
+  // PDF temp state
+  Uint8List? _tempPdfBytes;
+  bool _tempPdfIsTemplate = false;
+
   // =====================================
   // Getters
   // =====================================
   String get jsonData => _jsonData;
   dynamic get parsedJsonData => _parsedJsonData;
-  String get latexOutput => _latexOutput;
   EditMode get editMode => _editMode;
   ThemeMode get themeMode => _themeMode;
   bool get jsonDirtyFromInput => _jsonDirtyFromInput;
@@ -43,6 +45,10 @@ class CVDataProvider extends ChangeNotifier {
   List<Map<String, dynamic>>? get inputTabsDraft => _inputTabsDraft;
   bool get autosaveDataLoaded => _autosaveDataLoaded;
   bool get jsonImported => _jsonImported;
+
+  // PDF temp getters
+  Uint8List? get tempPdfBytes => _tempPdfBytes;
+  bool get tempPdfIsTemplate => _tempPdfIsTemplate;
 
   // =====================================
   // Setters
@@ -54,6 +60,13 @@ class CVDataProvider extends ChangeNotifier {
 
   set inputTabsDraft(List<Map<String, dynamic>>? value) {
     _inputTabsDraft = value;
+    notifyListeners();
+  }
+
+  // PDF temp setters
+  void updateTempPdfData(Uint8List? pdfBytes, bool isTemplate) {
+    _tempPdfBytes = pdfBytes;
+    _tempPdfIsTemplate = isTemplate;
     notifyListeners();
   }
 
@@ -87,14 +100,6 @@ class CVDataProvider extends ChangeNotifier {
     } catch (e) {
       _jsonData = '';
     }
-    notifyListeners();
-  }
-
-  // =====================================
-  // LaTeX Output Update
-  // =====================================
-  void updateLatexOutput(String newLatex) {
-    _latexOutput = newLatex;
     notifyListeners();
   }
 

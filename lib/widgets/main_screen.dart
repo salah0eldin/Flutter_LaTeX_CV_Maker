@@ -5,16 +5,30 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../views/json_view.dart';
 import '../views/input_view.dart';
-import '../views/latex_view.dart';
+import '../views/pdf_view.dart';
 import '../providers/cv_data_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'cv_file_handler.dart';
 import 'cv_file_handler_stub.dart'
     if (dart.library.html) 'main_screen_web.dart'
     if (dart.library.io) 'main_screen_desktop.dart';
+import 'main_screen_mobile.dart' as mobile_handler;
+
+// =====================================
+// Platform-aware file handler function
+// =====================================
+CVFileHandler _getPlatformFileHandler() {
+  if (kIsWeb) {
+    return getCVFileHandler();
+  } else if (defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS) {
+    return mobile_handler.getCVFileHandler();
+  } else {
+    return getCVFileHandler();
+  }
+}
 
 // All web/desktop-specific logic will be delegated to platform-specific files using conditional imports.
 
@@ -41,13 +55,15 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   bool canSwitch = true;
   static const double minWidthForAllViews = 1000.0;
 
-  // Store the width fractions for each view
-  double _jsonFraction = 0.32;
-  double _inputFraction = 0.40;
-  double _latexFraction = 0.25;
+  // Store the width fractions for each view (Input, JSON, PDF)
+  double _jsonFraction = 0.33;
+  double _inputFraction = 0.33;
+  double _pdfFraction = 0.34;
 
-  final CVFileHandler _fileHandler =
-      getCVFileHandler(); // Use platform-specific implementation
+  late final CVFileHandler _fileHandler;
+
+  // Preserve PDF view state
+  late final PDFView _pdfView;
 
   // =====================================
   // Save to History (delegated)
@@ -93,14 +109,44 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                     icon: const Icon(Icons.delete, color: Colors.red),
                     tooltip: 'Delete',
                     onPressed: () async {
-                      await _fileHandler.removeHistoryKey(context, key);
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Deleted "$name"'),
-                          backgroundColor: Colors.red,
-                        ),
+                      // Show confirmation dialog before deleting
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder:
+                            (context) => AlertDialog(
+                              title: const Text('Delete from History'),
+                              content: Text(
+                                'Are you sure you want to delete "$name" from history?\n\nThis action cannot be undone.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed:
+                                      () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed:
+                                      () => Navigator.of(context).pop(true),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
                       );
+
+                      // Only delete if user confirmed
+                      if (confirmed == true) {
+                        await _fileHandler.removeHistoryKey(context, key);
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Deleted "$name"'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     },
                   ),
                   onTap: () {
@@ -210,15 +256,39 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
+    // Initialize platform-specific file handler
+    _fileHandler = _getPlatformFileHandler();
+    // Initialize PDF view once to preserve state
+    _pdfView = const PDFView();
     _selectedIndex = widget.initialIndex;
     // Restore last state (draft) for all views
     Future.microtask(() async {
       final handler = _fileHandler;
       // Restore JSON/input state
       await handler.loadTempData(context);
-      // Restore LaTeX state
-      await handler.loadTempLatexData(context);
+      // Restore PDF state
+      await handler.loadTempPdfData(context);
     });
+  }
+
+  @override
+  void dispose() {
+    // Save PDF temp data before disposing
+    _savePdfTempDataBeforeDispose();
+    super.dispose();
+  }
+
+  Future<void> _savePdfTempDataBeforeDispose() async {
+    try {
+      final provider = context.read<CVDataProvider>();
+      await _fileHandler.saveTempPdfData(
+        context,
+        provider.tempPdfBytes,
+        provider.tempPdfIsTemplate,
+      );
+    } catch (e) {
+      debugPrint('Error saving PDF temp data on dispose: $e');
+    }
   }
 
   // =====================================
@@ -231,10 +301,13 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
 
     final editMode = context.watch<CVDataProvider>().editMode;
     final isEditing = editMode != EditMode.none;
-    return WillPopScope(
-      onWillPop: () async {
-        // No unsaved-changes check, just allow pop
-        return true;
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) {
+          // Save PDF temp data before closing
+          await _savePdfTempDataBeforeDispose();
+        }
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -257,8 +330,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                               context.read<CVDataProvider>().toggleTheme();
                               break;
                             case 'view':
-                              if (canSwitch)
+                              if (canSwitch) {
                                 setState(() => _showAllViews = !_showAllViews);
+                              }
                               break;
                             case 'import':
                               await _importJson();
@@ -458,8 +532,8 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                           label: 'Input',
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.description),
-                          label: 'LaTeX',
+                          icon: Icon(Icons.picture_as_pdf),
+                          label: 'PDF',
                         ),
                       ],
                     )
@@ -471,16 +545,16 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   Widget _buildSingleView(int index) {
-    switch (index) {
-      case 0:
-        return JsonView(onSave: _onJsonSave, onCancel: _onJsonCancel);
-      case 1:
-        return const InputView();
-      case 2:
-        return const LatexView();
-      default:
-        return Container();
-    }
+    // Use IndexedStack to preserve all view states
+    // All views are created once and kept alive, only visibility changes
+    return IndexedStack(
+      index: index,
+      children: [
+        JsonView(onSave: _onJsonSave, onCancel: _onJsonCancel), // Index 0
+        const InputView(), // Index 1
+        _pdfView, // Index 2
+      ],
+    );
   }
 
   Widget _buildMultiViewBody(double totalWidth) {
@@ -489,19 +563,18 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
         420.0; // Increased to ensure button row fits and prevent crushing
     double jsonWidth = _jsonFraction * totalWidth;
     double inputWidth = _inputFraction * totalWidth;
-    double latexWidth = _latexFraction * totalWidth;
+    double pdfWidth = _pdfFraction * totalWidth;
     final minTotal = minPanelWidth * 3 + dividerWidth * 2;
     if (totalWidth < minTotal) {
-      jsonWidth = inputWidth = latexWidth = (totalWidth - dividerWidth * 2) / 3;
+      jsonWidth = inputWidth = pdfWidth = (totalWidth - dividerWidth * 2) / 3;
     }
-    final usedWidth = jsonWidth + inputWidth + latexWidth + dividerWidth * 2;
+    final usedWidth = jsonWidth + inputWidth + pdfWidth + dividerWidth * 2;
     if (usedWidth > totalWidth) {
       final scale =
-          (totalWidth - dividerWidth * 2) /
-          (jsonWidth + inputWidth + latexWidth);
+          (totalWidth - dividerWidth * 2) / (jsonWidth + inputWidth + pdfWidth);
       jsonWidth *= scale;
       inputWidth *= scale;
-      latexWidth *= scale;
+      pdfWidth *= scale;
     }
     return Row(
       children: [
@@ -515,7 +588,7 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
               final delta = dx / totalWidth;
               _jsonFraction = (_jsonFraction + delta).clamp(0.1, 0.8);
               _inputFraction = (_inputFraction - delta).clamp(0.1, 0.8);
-              _latexFraction = 1 - _jsonFraction - _inputFraction;
+              _pdfFraction = 1 - _jsonFraction - _inputFraction;
             });
           },
         ),
@@ -525,12 +598,15 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
             setState(() {
               final delta = dx / totalWidth;
               _inputFraction = (_inputFraction + delta).clamp(0.1, 0.8);
-              _latexFraction = (_latexFraction - delta).clamp(0.1, 0.8);
-              _jsonFraction = 1 - _inputFraction - _latexFraction;
+              _pdfFraction = (_pdfFraction - delta).clamp(0.1, 0.8);
+              _jsonFraction = 1 - _inputFraction - _pdfFraction;
             });
           },
         ),
-        SizedBox(width: latexWidth, child: const LatexView()),
+        SizedBox(
+          width: pdfWidth,
+          child: _pdfView,
+        ), // Use preserved PDF view instance
       ],
     );
   }

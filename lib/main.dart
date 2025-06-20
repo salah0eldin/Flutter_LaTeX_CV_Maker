@@ -7,7 +7,6 @@ import 'providers/cv_data_provider.dart';
 import 'widgets/main_screen.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 
 // =====================================
 // main() Entry Point

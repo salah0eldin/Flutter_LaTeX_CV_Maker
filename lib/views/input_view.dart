@@ -566,8 +566,49 @@ class _InputViewState extends State<InputView> {
                 'enabled': section['enabled'] ?? true,
               };
 
-              // Check if it's the new structured format with mainHeader, extraInfo, etc.
-              if (section['mainHeader'] != null ||
+              // Check if it's the new multi-instance format with 'instances' array
+              if (section['instances'] != null &&
+                  section['instances'] is List) {
+                // New multi-instance format - parse each instance
+                final instances = <Map<String, dynamic>>[];
+                for (final instanceData in section['instances']) {
+                  final instance = <String, dynamic>{
+                    'expanded':
+                        instanceData['expanded'] ??
+                        true, // Default expanded for loaded data
+                  };
+
+                  // Parse each field in the instance
+                  for (final key in [
+                    'mainHeader',
+                    'extraInfo',
+                    'link',
+                    'date',
+                    'secondaryHeader',
+                    'location',
+                  ]) {
+                    instance[key] = {
+                      'enabled': instanceData[key]?['enabled'] ?? true,
+                      'value': instanceData[key]?['value'] ?? '',
+                    };
+                  }
+
+                  // Handle descriptions array for this instance
+                  instance['descriptions'] =
+                      (instanceData['descriptions'] as List?)
+                          ?.map(
+                            (desc) => {
+                              'enabled': desc['enabled'] ?? true,
+                              'value': desc['value'] ?? '',
+                            },
+                          )
+                          .toList() ??
+                      <Map<String, dynamic>>[];
+
+                  instances.add(instance);
+                }
+                bodyData['instances'] = instances;
+              } else if (section['mainHeader'] != null ||
                   section['extraInfo'] != null ||
                   section['skills'] != null ||
                   section['link'] != null ||
@@ -575,23 +616,42 @@ class _InputViewState extends State<InputView> {
                   section['secondaryHeader'] != null ||
                   section['location'] != null ||
                   section['descriptions'] != null) {
-                // New structured format
+                // Legacy structured format (single instance) - convert to multi-instance format
+                final singleInstance = <String, dynamic>{
+                  'expanded': true, // Default expanded for legacy data
+                };
+
+                // Handle legacy 'skills' field as 'extraInfo'
+                final extraInfoValue =
+                    section['extraInfo']?['value'] ??
+                    section['skills']?['value'] ??
+                    '';
+                final extraInfoEnabled =
+                    section['extraInfo']?['enabled'] ??
+                    section['skills']?['enabled'] ??
+                    true;
+
                 for (final key in [
                   'mainHeader',
-                  'extraInfo',
                   'link',
                   'date',
                   'secondaryHeader',
                   'location',
                 ]) {
-                  bodyData[key] = {
+                  singleInstance[key] = {
                     'enabled': section[key]?['enabled'] ?? true,
                     'value': section[key]?['value'] ?? '',
                   };
                 }
 
+                // Handle extraInfo (with legacy skills fallback)
+                singleInstance['extraInfo'] = {
+                  'enabled': extraInfoEnabled,
+                  'value': extraInfoValue,
+                };
+
                 // Handle descriptions array
-                bodyData['descriptions'] =
+                singleInstance['descriptions'] =
                     (section['descriptions'] as List?)
                         ?.map(
                           (desc) => {
@@ -601,8 +661,12 @@ class _InputViewState extends State<InputView> {
                         )
                         .toList() ??
                     <Map<String, dynamic>>[];
+
+                bodyData['instances'] = [singleInstance];
               } else {
-                // Legacy format or minimal format - initialize with default structure
+                // Minimal format - initialize with default single instance
+                final defaultInstance = <String, dynamic>{'expanded': true};
+
                 for (final key in [
                   'mainHeader',
                   'extraInfo',
@@ -611,9 +675,11 @@ class _InputViewState extends State<InputView> {
                   'secondaryHeader',
                   'location',
                 ]) {
-                  bodyData[key] = {'enabled': true, 'value': ''};
+                  defaultInstance[key] = {'enabled': true, 'value': ''};
                 }
-                bodyData['descriptions'] = <Map<String, dynamic>>[];
+                defaultInstance['descriptions'] = <Map<String, dynamic>>[];
+
+                bodyData['instances'] = [defaultInstance];
               }
 
               newTabs.add(
@@ -716,8 +782,49 @@ class _InputViewState extends State<InputView> {
                 'enabled': section['enabled'] ?? true,
               };
 
-              // Check if it's the new structured format with mainHeader, extraInfo, etc.
-              if (section['mainHeader'] != null ||
+              // Check if it's the new multi-instance format with 'instances' array
+              if (section['instances'] != null &&
+                  section['instances'] is List) {
+                // New multi-instance format - parse each instance
+                final instances = <Map<String, dynamic>>[];
+                for (final instanceData in section['instances']) {
+                  final instance = <String, dynamic>{
+                    'expanded':
+                        instanceData['expanded'] ??
+                        true, // Default expanded for loaded data
+                  };
+
+                  // Parse each field in the instance
+                  for (final key in [
+                    'mainHeader',
+                    'extraInfo',
+                    'link',
+                    'date',
+                    'secondaryHeader',
+                    'location',
+                  ]) {
+                    instance[key] = {
+                      'enabled': instanceData[key]?['enabled'] ?? true,
+                      'value': instanceData[key]?['value'] ?? '',
+                    };
+                  }
+
+                  // Handle descriptions array for this instance
+                  instance['descriptions'] =
+                      (instanceData['descriptions'] as List?)
+                          ?.map(
+                            (desc) => {
+                              'enabled': desc['enabled'] ?? true,
+                              'value': desc['value'] ?? '',
+                            },
+                          )
+                          .toList() ??
+                      <Map<String, dynamic>>[];
+
+                  instances.add(instance);
+                }
+                bodyData['instances'] = instances;
+              } else if (section['mainHeader'] != null ||
                   section['extraInfo'] != null ||
                   section['skills'] != null ||
                   section['link'] != null ||
@@ -725,23 +832,42 @@ class _InputViewState extends State<InputView> {
                   section['secondaryHeader'] != null ||
                   section['location'] != null ||
                   section['descriptions'] != null) {
-                // New structured format
+                // Legacy structured format (single instance) - convert to multi-instance format
+                final singleInstance = <String, dynamic>{
+                  'expanded': true, // Default expanded for legacy data
+                };
+
+                // Handle legacy 'skills' field as 'extraInfo'
+                final extraInfoValue =
+                    section['extraInfo']?['value'] ??
+                    section['skills']?['value'] ??
+                    '';
+                final extraInfoEnabled =
+                    section['extraInfo']?['enabled'] ??
+                    section['skills']?['enabled'] ??
+                    true;
+
                 for (final key in [
                   'mainHeader',
-                  'extraInfo',
                   'link',
                   'date',
                   'secondaryHeader',
                   'location',
                 ]) {
-                  bodyData[key] = {
+                  singleInstance[key] = {
                     'enabled': section[key]?['enabled'] ?? true,
                     'value': section[key]?['value'] ?? '',
                   };
                 }
 
+                // Handle extraInfo (with legacy skills fallback)
+                singleInstance['extraInfo'] = {
+                  'enabled': extraInfoEnabled,
+                  'value': extraInfoValue,
+                };
+
                 // Handle descriptions array
-                bodyData['descriptions'] =
+                singleInstance['descriptions'] =
                     (section['descriptions'] as List?)
                         ?.map(
                           (desc) => {
@@ -751,8 +877,12 @@ class _InputViewState extends State<InputView> {
                         )
                         .toList() ??
                     <Map<String, dynamic>>[];
+
+                bodyData['instances'] = [singleInstance];
               } else {
-                // Legacy format or minimal format - initialize with default structure
+                // Minimal format - initialize with default single instance
+                final defaultInstance = <String, dynamic>{'expanded': true};
+
                 for (final key in [
                   'mainHeader',
                   'extraInfo',
@@ -761,9 +891,11 @@ class _InputViewState extends State<InputView> {
                   'secondaryHeader',
                   'location',
                 ]) {
-                  bodyData[key] = {'enabled': true, 'value': ''};
+                  defaultInstance[key] = {'enabled': true, 'value': ''};
                 }
-                bodyData['descriptions'] = <Map<String, dynamic>>[];
+                defaultInstance['descriptions'] = <Map<String, dynamic>>[];
+
+                bodyData['instances'] = [defaultInstance];
               }
 
               newTabs.add(

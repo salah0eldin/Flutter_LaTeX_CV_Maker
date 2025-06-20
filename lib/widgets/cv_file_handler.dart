@@ -1,5 +1,6 @@
 // cv_file_handler.dart
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
 abstract class CVFileHandler {
   Future<void> saveToHistory(BuildContext context, String jsonData);
@@ -10,6 +11,10 @@ abstract class CVFileHandler {
   Future<String?> loadHistoryItem(BuildContext context, String key);
   Future<void> loadTempData(BuildContext context);
   Future<void> saveTempData(BuildContext context);
-  Future<void> loadTempLatexData(BuildContext context);
-  Future<void> saveTempLatexData(BuildContext context);
+  Future<void> loadTempPdfData(BuildContext context);
+  Future<void> saveTempPdfData(
+    BuildContext context,
+    Uint8List? pdfBytes,
+    bool isTemplate,
+  );
 }

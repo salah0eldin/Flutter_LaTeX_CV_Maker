@@ -1,5 +1,6 @@
 import 'dart:html' as html;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -40,7 +41,15 @@ class CVFileHandlerWeb implements CVFileHandler {
     if (name != null && name.isNotEmpty) {
       final sanitized = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final key = 'cv_history_$sanitized';
-      html.window.localStorage[key] = jsonData;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final dataWithTimestamp = json.encode({
+        'data': jsonData,
+        'timestamp': timestamp,
+        'name': sanitized,
+      });
+      html.window.localStorage[key] = dataWithTimestamp;
+      // Update latest history reference
+      html.window.localStorage['cv_latest_history'] = key;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Saved "$sanitized" to history'),
@@ -105,9 +114,41 @@ class CVFileHandlerWeb implements CVFileHandler {
 
   @override
   Future<List<String>> getHistoryKeys(BuildContext context) async {
-    return html.window.localStorage.keys
-        .where((k) => k.startsWith('cv_history_'))
-        .toList();
+    final keys =
+        html.window.localStorage.keys
+            .where((k) => k.startsWith('cv_history_'))
+            .toList();
+
+    // Sort by timestamp (newest first) if available
+    keys.sort((a, b) {
+      try {
+        final aData = html.window.localStorage[a];
+        final bData = html.window.localStorage[b];
+
+        if (aData != null && bData != null) {
+          final aParsed = json.decode(aData);
+          final bParsed = json.decode(bData);
+
+          if (aParsed is Map &&
+              bParsed is Map &&
+              aParsed['timestamp'] != null &&
+              bParsed['timestamp'] != null) {
+            final aTime = aParsed['timestamp'] as int;
+            final bTime = bParsed['timestamp'] as int;
+            // Ensure newest comes first by comparing bTime to aTime
+            final result = bTime.compareTo(aTime);
+            return result; // Newest first (larger timestamp first)
+          }
+        }
+      } catch (_) {
+        // Fallback to reverse alphabetical sort for old format (newer names tend to be later)
+        return b.compareTo(a);
+      }
+      // Default: reverse alphabetical to get newer entries first
+      return b.compareTo(a);
+    });
+
+    return keys;
   }
 
   @override
@@ -117,23 +158,134 @@ class CVFileHandlerWeb implements CVFileHandler {
 
   @override
   Future<String?> loadHistoryItem(BuildContext context, String key) async {
-    return html.window.localStorage[key];
+    final rawData = html.window.localStorage[key];
+    if (rawData == null) return null;
+
+    try {
+      // Try to parse as new format with timestamp
+      final parsed = json.decode(rawData);
+      if (parsed is Map && parsed['data'] != null) {
+        return parsed['data'] as String;
+      }
+    } catch (_) {
+      // If parsing fails, assume it's old format (just the JSON data)
+    }
+
+    // Return as-is for old format
+    return rawData;
+  }
+
+  // Helper method to get the latest history data
+  Future<String?> _getLatestHistoryData() async {
+    // First check for explicitly marked latest
+    final latestKey = html.window.localStorage['cv_latest_history'];
+    if (latestKey != null) {
+      final rawData = html.window.localStorage[latestKey];
+      if (rawData != null) {
+        try {
+          // Try to parse as new format with timestamp
+          final parsed = json.decode(rawData);
+          if (parsed is Map && parsed['data'] != null) {
+            return parsed['data'] as String;
+          }
+        } catch (_) {
+          // If parsing fails, assume it's old format (just the JSON data)
+        }
+        // Return as-is for old format
+        return rawData;
+      }
+    }
+
+    // Fallback: find the most recent by checking all history items
+    final allKeys =
+        html.window.localStorage.keys
+            .where((k) => k.startsWith('cv_history_'))
+            .toList();
+
+    if (allKeys.isEmpty) return null;
+
+    String? mostRecentKey;
+    int mostRecentTimestamp = 0;
+
+    for (final key in allKeys) {
+      final rawData = html.window.localStorage[key];
+      if (rawData != null) {
+        try {
+          final parsed = json.decode(rawData);
+          if (parsed is Map && parsed['timestamp'] != null) {
+            final timestamp = parsed['timestamp'] as int;
+            if (timestamp > mostRecentTimestamp) {
+              mostRecentTimestamp = timestamp;
+              mostRecentKey = key;
+            }
+          }
+        } catch (_) {
+          // Old format without timestamp, skip
+        }
+      }
+    }
+
+    if (mostRecentKey != null) {
+      final rawData = html.window.localStorage[mostRecentKey];
+      if (rawData != null) {
+        try {
+          final parsed = json.decode(rawData);
+          if (parsed is Map && parsed['data'] != null) {
+            return parsed['data'] as String;
+          }
+        } catch (_) {
+          // Old format
+        }
+        return rawData;
+      }
+    }
+
+    return null;
   }
 
   // Temp data: use localStorage for web
   static const String _tempFileName = 'cv_temp_autosave.json';
-  static const String _tempLatexFileName = 'cv_temp_autosave.tex';
 
   @override
   Future<void> loadTempData(BuildContext context) async {
-    final jsonData = html.window.localStorage[_tempFileName];
-    if (jsonData != null) {
+    // First try to load temp autosave data
+    final tempData = html.window.localStorage[_tempFileName];
+    if (tempData != null) {
       try {
-        json.decode(jsonData);
+        json.decode(tempData);
         // ignore: use_build_context_synchronously
-        context.read<CVDataProvider>().updateJsonData(jsonData);
+        context.read<CVDataProvider>().updateJsonData(tempData);
         context.read<CVDataProvider>().setAutosaveDataLoaded();
-      } catch (_) {}
+        return; // Found temp data, don't load from history
+      } catch (_) {
+        // Invalid temp data, continue to try history
+      }
+    }
+
+    // No valid temp data found, try to load the latest history item
+    final latestHistoryData = await _getLatestHistoryData();
+    if (latestHistoryData != null) {
+      try {
+        json.decode(latestHistoryData);
+        // ignore: use_build_context_synchronously
+        context.read<CVDataProvider>().updateJsonDataFromImport(
+          latestHistoryData,
+        );
+        context.read<CVDataProvider>().setAutosaveDataLoaded();
+
+        // Show a message that we loaded from history
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Loaded latest CV from history'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (_) {
+        // Invalid history data
+      }
     }
   }
 
@@ -149,18 +301,56 @@ class CVFileHandlerWeb implements CVFileHandler {
   }
 
   @override
-  Future<void> loadTempLatexData(BuildContext context) async {
-    final latexData = html.window.localStorage[_tempLatexFileName];
-    if (latexData != null && latexData.isNotEmpty) {
-      // ignore: use_build_context_synchronously
-      context.read<CVDataProvider>().updateLatexOutput(latexData);
+  Future<void> loadTempPdfData(BuildContext context) async {
+    try {
+      final pdfDataB64 = html.window.localStorage['cv_temp_pdf_data'];
+      final pdfMeta = html.window.localStorage['cv_temp_pdf_meta'];
+
+      if (pdfDataB64 != null && pdfDataB64.isNotEmpty && pdfMeta != null) {
+        final pdfBytes = base64Decode(pdfDataB64);
+        final isTemplate = pdfMeta.trim() == 'template';
+
+        if (pdfBytes.isNotEmpty) {
+          context.read<CVDataProvider>().updateTempPdfData(
+            pdfBytes,
+            isTemplate,
+          );
+          debugPrint(
+            'DEBUG: Loaded temp PDF data from localStorage (isTemplate: $isTemplate)',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error loading temp PDF data: $e');
     }
   }
 
   @override
-  Future<void> saveTempLatexData(BuildContext context) async {
-    final latexData = context.read<CVDataProvider>().latexOutput;
-    html.window.localStorage[_tempLatexFileName] = latexData;
+  Future<void> saveTempPdfData(
+    BuildContext context,
+    Uint8List? pdfBytes,
+    bool isTemplate,
+  ) async {
+    try {
+      if (pdfBytes != null && pdfBytes.isNotEmpty) {
+        final pdfDataB64 = base64Encode(pdfBytes);
+        html.window.localStorage['cv_temp_pdf_data'] = pdfDataB64;
+        html.window.localStorage['cv_temp_pdf_meta'] =
+            isTemplate ? 'template' : 'generated';
+        debugPrint(
+          'DEBUG: Saved temp PDF data to localStorage (isTemplate: $isTemplate)',
+        );
+      } else {
+        // Remove temp data if no PDF
+        html.window.localStorage.remove('cv_temp_pdf_data');
+        html.window.localStorage.remove('cv_temp_pdf_meta');
+        debugPrint(
+          'DEBUG: Removed temp PDF data from localStorage (no data to save)',
+        );
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error saving temp PDF data: $e');
+    }
   }
 }
 

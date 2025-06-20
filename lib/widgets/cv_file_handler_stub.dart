@@ -2,6 +2,7 @@
 // Platform-agnostic interface for import/export/history
 
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import 'cv_file_handler.dart';
 
 // Fallback implementation (should never be used)
@@ -49,17 +50,17 @@ class CVFileHandlerStub implements CVFileHandler {
   }
 
   @override
-  Future<void> loadTempLatexData(BuildContext context) async {
-    throw UnimplementedError(
-      'No platform implementation for loadTempLatexData.',
-    );
+  Future<void> loadTempPdfData(BuildContext context) async {
+    throw UnimplementedError('No platform implementation for loadTempPdfData.');
   }
 
   @override
-  Future<void> saveTempLatexData(BuildContext context) async {
-    throw UnimplementedError(
-      'No platform implementation for saveTempLatexData.',
-    );
+  Future<void> saveTempPdfData(
+    BuildContext context,
+    Uint8List? pdfBytes,
+    bool isTemplate,
+  ) async {
+    throw UnimplementedError('No platform implementation for saveTempPdfData.');
   }
 }
 
