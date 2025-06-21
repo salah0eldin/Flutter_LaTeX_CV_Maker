@@ -2,6 +2,7 @@
 // Imports and Dependencies
 // =====================================
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Add for HapticFeedback
 import 'dart:convert';
 import 'dart:async'; // Add for Timer
 import '../views/json_view.dart';
@@ -68,6 +69,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
 
   // Auto-save debouncing
   Timer? _autoSaveTimer;
+
+  // Page controller for swipe navigation on mobile
+  late final PageController _pageController;
 
   // =====================================
   // Save to History (delegated)
@@ -261,6 +265,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
     _pdfView = const PDFView();
     _selectedIndex = widget.initialIndex;
 
+    // Initialize page controller for swipe navigation
+    _pageController = PageController(initialPage: widget.initialIndex);
+
     // Set up auto-save callback for non-web platforms
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<CVDataProvider>();
@@ -286,6 +293,8 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   void dispose() {
     // Cancel auto-save timer
     _autoSaveTimer?.cancel();
+    // Dispose page controller
+    _pageController.dispose();
     // Save PDF temp data before disposing
     _savePdfTempDataBeforeDispose();
     super.dispose();
@@ -573,6 +582,16 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                         setState(() {
                           _selectedIndex = index;
                         });
+
+                        // On mobile, also animate PageController to the selected page
+                        if (defaultTargetPlatform == TargetPlatform.android ||
+                            defaultTargetPlatform == TargetPlatform.iOS) {
+                          _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
                       },
                       destinations: const [
                         NavigationDestination(
@@ -597,16 +616,69 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   }
 
   Widget _buildSingleView(int index) {
-    // Use IndexedStack to preserve all view states
-    // All views are created once and kept alive, only visibility changes
-    return IndexedStack(
-      index: index,
-      children: [
-        JsonView(onSave: _onJsonSave, onCancel: _onJsonCancel), // Index 0
-        const InputView(), // Index 1
-        _pdfView, // Index 2
-      ],
-    );
+    // On mobile platforms, use PageView for swipe navigation
+    // On desktop, use IndexedStack for tab-like behavior
+    if (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      return NotificationListener<ScrollNotification>(
+        onNotification: (scrollNotification) {
+          // Provide haptic feedback when user starts swiping
+          if (scrollNotification is ScrollStartNotification) {
+            HapticFeedback.selectionClick();
+          }
+          return false;
+        },
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (newIndex) {
+            // Prevent navigation if editing
+            final editMode = context.read<CVDataProvider>().editMode;
+            if (editMode != EditMode.none) {
+              // Reset to current page if editing
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _pageController.animateToPage(
+                  _selectedIndex,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Finish or cancel editing before switching views.',
+                  ),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+
+            // Provide haptic feedback when page changes
+            HapticFeedback.lightImpact();
+
+            setState(() {
+              _selectedIndex = newIndex;
+            });
+          },
+          children: [
+            JsonView(onSave: _onJsonSave, onCancel: _onJsonCancel), // Index 0
+            const InputView(), // Index 1
+            _pdfView, // Index 2
+          ],
+        ),
+      );
+    } else {
+      // Desktop: Use IndexedStack to preserve all view states
+      // All views are created once and kept alive, only visibility changes
+      return IndexedStack(
+        index: index,
+        children: [
+          JsonView(onSave: _onJsonSave, onCancel: _onJsonCancel), // Index 0
+          const InputView(), // Index 1
+          _pdfView, // Index 2
+        ],
+      );
+    }
   }
 
   Widget _buildMultiViewBody(double totalWidth) {
