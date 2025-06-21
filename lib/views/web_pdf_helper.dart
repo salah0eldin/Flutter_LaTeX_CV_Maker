@@ -4,6 +4,11 @@ import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
 class WebPdfHelper {
+  // Cache for PDF iframe view types
+  static String? _cachedViewType;
+  static String? _cachedDataUrl;
+  static bool? _cachedIsDarkMode;
+
   static void openPdfInNewTab(Uint8List pdfBytes) {
     try {
       // Create blob URL and open in new tab
@@ -26,16 +31,30 @@ class WebPdfHelper {
     bool isDarkMode = false,
   }) {
     try {
-      // Clean up previous iframe if it exists
-      _cleanup();
-
       // Create data URL for the PDF
       final base64String = html.window.btoa(String.fromCharCodes(pdfBytes));
       final dataUrl = 'data:application/pdf;base64,$base64String';
 
+      // Check if we can reuse the cached iframe
+      if (_cachedViewType != null &&
+          _cachedDataUrl == dataUrl &&
+          _cachedIsDarkMode == isDarkMode) {
+        // Return the cached view type
+        return _cachedViewType!;
+      }
+
+      // Clean up previous iframe if it exists
+      _cleanup();
+
       // Register the iframe factory with a unique view type
       final uniqueViewType =
           '${viewType}_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Cache the values
+      _cachedViewType = uniqueViewType;
+      _cachedDataUrl = dataUrl;
+      _cachedIsDarkMode = isDarkMode;
+
       ui_web.platformViewRegistry.registerViewFactory(uniqueViewType, (
         int viewId,
       ) {
@@ -154,8 +173,10 @@ class WebPdfHelper {
   }
 
   static void _cleanup() {
-    // No need to clean up data URLs as they don't need to be revoked
-    // Unlike blob URLs, data URLs are self-contained
+    // Clear cache when cleaning up
+    _cachedViewType = null;
+    _cachedDataUrl = null;
+    _cachedIsDarkMode = null;
   }
 
   static void dispose() {

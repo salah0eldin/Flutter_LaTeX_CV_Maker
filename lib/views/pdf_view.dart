@@ -38,6 +38,11 @@ class _PDFViewState extends State<PDFView> {
   String? _error;
   bool _isShowingTemplate = false;
 
+  // Web PDF iframe caching
+  String? _cachedWebViewType;
+  Uint8List? _cachedPdfBytes;
+  bool? _cachedIsDarkMode;
+
   // =====================================
   // initState
   // =====================================
@@ -63,6 +68,15 @@ class _PDFViewState extends State<PDFView> {
   }
 
   // =====================================
+  // Clear Web PDF Cache
+  // =====================================
+  void _clearWebPdfCache() {
+    _cachedWebViewType = null;
+    _cachedPdfBytes = null;
+    _cachedIsDarkMode = null;
+  }
+
+  // =====================================
   // Load Template PDF from Assets
   // =====================================
   Future<void> _loadTemplatePdf() async {
@@ -77,6 +91,8 @@ class _PDFViewState extends State<PDFView> {
         _isLoadingTemplate = false;
         _isShowingTemplate = true; // Show template by default
       });
+      // Clear web PDF cache since we're changing PDFs
+      if (kIsWeb) _clearWebPdfCache();
       // Update provider with template data
       _updatePdfStateInProvider();
       debugPrint(
@@ -105,6 +121,8 @@ class _PDFViewState extends State<PDFView> {
         _pdfBytes = null; // Clear any generated PDF
         _error = null;
       });
+      // Clear web PDF cache since we're switching to template
+      if (kIsWeb) _clearWebPdfCache();
       // Update provider with template state
       _updatePdfStateInProvider();
 
@@ -1219,15 +1237,29 @@ class _PDFViewState extends State<PDFView> {
       // Detect current theme for dark mode support
       final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-      // Create iframe view type using PDF bytes as identifier
-      final viewType = WebPdfHelper.createPdfIframe(
-        'pdf-iframe',
-        pdfBytes,
-        isDarkMode: isDarkMode,
-      );
+      // Check if we need to create a new iframe or can reuse the cached one
+      final needsNewIframe =
+          _cachedWebViewType == null ||
+          _cachedPdfBytes == null ||
+          _cachedIsDarkMode != isDarkMode ||
+          !listEquals(_cachedPdfBytes!, pdfBytes);
+
+      if (needsNewIframe) {
+        // Create iframe view type using PDF bytes as identifier
+        final viewType = WebPdfHelper.createPdfIframe(
+          'pdf-iframe',
+          pdfBytes,
+          isDarkMode: isDarkMode,
+        );
+
+        // Cache the values
+        _cachedWebViewType = viewType;
+        _cachedPdfBytes = Uint8List.fromList(pdfBytes);
+        _cachedIsDarkMode = isDarkMode;
+      }
 
       // Use HtmlElementView to display the registered iframe
-      return _createHtmlElementView(viewType);
+      return _createHtmlElementView(_cachedWebViewType!);
     } catch (e) {
       debugPrint('Error creating PDF iframe: $e');
       return _buildIframeFallback(pdfBytes, e.toString());
@@ -1474,6 +1506,8 @@ class _PDFViewState extends State<PDFView> {
           _isShowingTemplate = false;
         }
       });
+      // Clear web PDF cache since we're restoring a different PDF
+      if (kIsWeb) _clearWebPdfCache();
       debugPrint(
         'PDF view initialized from temp data (isTemplate: ${provider.tempPdfIsTemplate})',
       );
