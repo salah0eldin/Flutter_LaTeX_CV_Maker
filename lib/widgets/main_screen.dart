@@ -3,6 +3,7 @@
 // =====================================
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:async'; // Add for Timer
 import '../views/json_view.dart';
 import '../views/input_view.dart';
 import '../views/pdf_view.dart';
@@ -64,6 +65,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
 
   // Preserve PDF view state
   late final PDFView _pdfView;
+
+  // Auto-save debouncing
+  Timer? _autoSaveTimer;
 
   // =====================================
   // Save to History (delegated)
@@ -214,8 +218,7 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
       provider.clearJsonDirtyFromInput();
       provider.clearInputDirtyFromJson();
 
-      // Save to autosave
-      await _fileHandler.saveTempData(context);
+      // Auto-save will be triggered automatically by provider when data changes
 
       // Show success message (moved from file handlers to here)
       if (mounted) {
@@ -261,6 +264,18 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
     // Initialize PDF view once to preserve state
     _pdfView = const PDFView();
     _selectedIndex = widget.initialIndex;
+
+    // Set up auto-save callback for non-web platforms
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<CVDataProvider>();
+      provider.setAutoSaveCallback(() {
+        _autoSaveData();
+      });
+      provider.setAutoSavePdfCallback(() {
+        _autoSavePdfData();
+      });
+    });
+
     // Restore last state (draft) for all views
     Future.microtask(() async {
       final handler = _fileHandler;
@@ -273,6 +288,8 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
 
   @override
   void dispose() {
+    // Cancel auto-save timer
+    _autoSaveTimer?.cancel();
     // Save PDF temp data before disposing
     _savePdfTempDataBeforeDispose();
     super.dispose();
@@ -288,6 +305,45 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
       );
     } catch (e) {
       debugPrint('Error saving PDF temp data on dispose: $e');
+    }
+  }
+
+  // =====================================
+  // Auto-save functionality
+  // =====================================
+  void _autoSaveData() {
+    if (!kIsWeb) {
+      // Cancel previous timer if it exists
+      _autoSaveTimer?.cancel();
+
+      // Set up a new timer to debounce rapid changes
+      _autoSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+        try {
+          await _fileHandler.saveTempData(context);
+          debugPrint('DEBUG: Auto-saved temp data');
+        } catch (e) {
+          debugPrint('DEBUG: Error during auto-save: $e');
+        }
+      });
+    }
+  }
+
+  void _autoSavePdfData() {
+    if (!kIsWeb) {
+      // Auto-save PDF temp data for non-web platforms
+      Future.microtask(() async {
+        try {
+          final provider = context.read<CVDataProvider>();
+          await _fileHandler.saveTempPdfData(
+            context,
+            provider.tempPdfBytes,
+            provider.tempPdfIsTemplate,
+          );
+          debugPrint('DEBUG: Auto-saved PDF temp data');
+        } catch (e) {
+          debugPrint('DEBUG: Error during PDF auto-save: $e');
+        }
+      });
     }
   }
 

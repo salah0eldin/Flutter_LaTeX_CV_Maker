@@ -56,11 +56,13 @@ class CVDataProvider extends ChangeNotifier {
   set inputTabsJson(String value) {
     _inputTabsJson = value;
     notifyListeners();
+    _triggerAutoSave(); // Auto-save when input tabs JSON changes
   }
 
   set inputTabsDraft(List<Map<String, dynamic>>? value) {
     _inputTabsDraft = value;
     notifyListeners();
+    _triggerAutoSave(); // Auto-save when input tabs draft changes
   }
 
   // PDF temp setters
@@ -68,6 +70,7 @@ class CVDataProvider extends ChangeNotifier {
     _tempPdfBytes = pdfBytes;
     _tempPdfIsTemplate = isTemplate;
     notifyListeners();
+    _triggerAutoSavePdf(); // Auto-save PDF data when it changes
   }
 
   // =====================================
@@ -81,6 +84,7 @@ class CVDataProvider extends ChangeNotifier {
       _parsedJsonData = null; // Invalid JSON
     }
     notifyListeners();
+    _triggerAutoSave(); // Auto-save on data change
   }
 
   // Update JSON data from import (external source)
@@ -88,6 +92,7 @@ class CVDataProvider extends ChangeNotifier {
     updateJsonData(newData);
     _jsonImported = true;
     notifyListeners();
+    // Note: updateJsonData already calls _triggerAutoSave()
   }
 
   // =====================================
@@ -101,6 +106,7 @@ class CVDataProvider extends ChangeNotifier {
       _jsonData = '';
     }
     notifyListeners();
+    _triggerAutoSave(); // Auto-save on data change
   }
 
   // =====================================
@@ -156,5 +162,33 @@ class CVDataProvider extends ChangeNotifier {
   void clearJsonImported() {
     _jsonImported = false;
     notifyListeners();
+  }
+
+  // =====================================
+  // Auto-save functionality
+  // =====================================
+  VoidCallback? _autoSaveCallback;
+  VoidCallback? _autoSavePdfCallback;
+
+  void setAutoSaveCallback(VoidCallback? callback) {
+    _autoSaveCallback = callback;
+  }
+
+  void setAutoSavePdfCallback(VoidCallback? callback) {
+    _autoSavePdfCallback = callback;
+  }
+
+  void _triggerAutoSave() {
+    if (_autoSaveCallback != null && !kIsWeb) {
+      // Don't auto-save on web to avoid potential issues
+      _autoSaveCallback!();
+    }
+  }
+
+  void _triggerAutoSavePdf() {
+    if (_autoSavePdfCallback != null && !kIsWeb) {
+      // Don't auto-save PDF on web to avoid potential issues
+      _autoSavePdfCallback!();
+    }
   }
 }

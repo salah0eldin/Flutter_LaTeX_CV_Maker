@@ -13,10 +13,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cv_data_provider.dart';
-import '../widgets/main_screen_desktop.dart'
-    if (dart.library.html) '../widgets/main_screen_web.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 class InputView extends StatefulWidget {
   const InputView({super.key});
@@ -105,18 +101,13 @@ class _InputViewState extends State<InputView> {
     setState(() {
       _dirtyFromJson = false;
     });
-    // Save draft to provider
+    // Save draft to provider (auto-save will be triggered automatically)
     final provider = context.read<CVDataProvider>();
     provider.inputTabsDraft = _tabs.map((t) => t.toMap()).toList();
-    // Also trigger autosave to disk to prevent tabs from being restored after deletion
-    _autosaveAfterChange();
   }
 
-  // Autosave after any change (including tab deletion)
-  void _autosaveAfterChange() async {
-    final fileHandler = getCVFileHandler();
-    await fileHandler.saveTempData(context);
-  }
+  // Note: Autosave is now handled automatically via CVDataProvider callbacks
+  // No need for manual autosave calls since data changes trigger auto-save
 
   // Clear all tabs with confirmation
   Future<void> _clearAllTabs() async {
@@ -503,23 +494,8 @@ class _InputViewState extends State<InputView> {
     setState(() {
       _dirtyFromJson = false;
     });
-    // --- AUTOSAVE: Save draft to provider after every save ---
+    // --- AUTOSAVE: Save draft to provider after every save (auto-save will be triggered automatically) ---
     provider.inputTabsDraft = _tabs.map((t) => t.toMap()).toList();
-    // --- AUTOSAVE: Save temp file to disk after every save ---
-    final fileHandler = getCVFileHandler();
-    await fileHandler.saveTempData(context);
-    // Log the file path for desktop
-    try {
-      if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
-        final appDir = await getApplicationSupportDirectory();
-        final tempFilePath = '${appDir.path}/cv_temp_autosave.json';
-        debugPrint('Temp autosave file path: $tempFilePath');
-      } else {
-        debugPrint('Temp autosave file: web/localStorage or unknown platform');
-      }
-    } catch (e) {
-      debugPrint('Temp autosave file: error getting path ($e)');
-    }
   }
 
   void _updateView(CVDataProvider provider) {

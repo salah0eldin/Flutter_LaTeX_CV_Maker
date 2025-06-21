@@ -9,8 +9,6 @@ import 'package:code_text_field/code_text_field.dart';
 import 'package:highlight/languages/json.dart';
 import 'dart:convert';
 import '../providers/cv_data_provider.dart';
-import '../widgets/main_screen_desktop.dart'
-    if (dart.library.html) '../widgets/main_screen_web.dart';
 
 // =====================================
 // JsonView Widget
@@ -134,15 +132,16 @@ class _JsonViewState extends State<JsonView> {
   }
 
   void _saveEdit(CVDataProvider provider) {
-    provider.updateJsonData(_codeController.text);
+    final jsonText = _codeController.text;
+    provider.updateJsonData(jsonText);
+    // Also update inputTabsJson to keep it in sync for temp file saving
+    provider.inputTabsJson = jsonText;
     provider.setEditMode(EditMode.none);
     setState(() {
       _editing = false;
     });
     provider.setInputDirtyFromJson();
-    // --- AUTOSAVE: Save temp file to disk after every save ---
-    final fileHandler = getCVFileHandler();
-    fileHandler.saveTempData(context);
+    // --- Auto-save will be triggered automatically by the provider ---
     // Mark InputView as dirty so its Edit button is disabled
     if (widget.onSave != null) widget.onSave!();
   }

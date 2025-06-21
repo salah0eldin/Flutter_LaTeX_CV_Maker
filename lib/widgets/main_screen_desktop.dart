@@ -13,6 +13,44 @@ import '../providers/cv_data_provider.dart';
 import 'cv_file_handler.dart';
 
 class CVFileHandlerDesktop implements CVFileHandler {
+  // Unified folder structure in Documents
+  static const String _cvMakerFolderName = 'cv_maker';
+  static const String _tempFolderName = 'temp';
+  static const String _historyFolderName = 'history';
+  static const String _tempFileName = 'cv_temp_autosave.json';
+  static const String _tempPdfFileName = 'cv_temp_autosave.pdf';
+  static const String _tempPdfMetaFileName = 'cv_temp_autosave_pdf.meta';
+
+  // Helper method to get the cv_maker directory in Documents
+  Future<Directory> _getCVMakerDirectory() async {
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final cvMakerDir = Directory('${documentsDir.path}/$_cvMakerFolderName');
+    if (!await cvMakerDir.exists()) {
+      await cvMakerDir.create(recursive: true);
+    }
+    return cvMakerDir;
+  }
+
+  // Helper method to get temp directory
+  Future<Directory> _getTempDirectory() async {
+    final cvMakerDir = await _getCVMakerDirectory();
+    final tempDir = Directory('${cvMakerDir.path}/$_tempFolderName');
+    if (!await tempDir.exists()) {
+      await tempDir.create(recursive: true);
+    }
+    return tempDir;
+  }
+
+  // Helper method to get history directory
+  Future<Directory> _getHistoryDirectory() async {
+    final cvMakerDir = await _getCVMakerDirectory();
+    final historyDir = Directory('${cvMakerDir.path}/$_historyFolderName');
+    if (!await historyDir.exists()) {
+      await historyDir.create(recursive: true);
+    }
+    return historyDir;
+  }
+
   @override
   Future<void> saveToHistory(BuildContext context, String jsonData) async {
     final name = await showDialog<String>(
@@ -45,8 +83,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
     );
     if (name != null && name.isNotEmpty) {
       final sanitized = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/cv_history_$sanitized.json');
+      final historyDir = await _getHistoryDirectory();
+      final file = File('${historyDir.path}/cv_history_$sanitized.json');
       await file.writeAsString(jsonData);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -142,8 +180,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
 
   @override
   Future<List<String>> getHistoryKeys(BuildContext context) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final files = directory.listSync().whereType<File>();
+    final historyDir = await _getHistoryDirectory();
+    final files = historyDir.listSync().whereType<File>();
     final historyFiles =
         files
             .where(
@@ -170,8 +208,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
 
   @override
   Future<void> removeHistoryKey(BuildContext context, String key) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/$key.json');
+    final historyDir = await _getHistoryDirectory();
+    final file = File('${historyDir.path}/$key.json');
     if (await file.exists()) {
       await file.delete();
     }
@@ -179,24 +217,19 @@ class CVFileHandlerDesktop implements CVFileHandler {
 
   @override
   Future<String?> loadHistoryItem(BuildContext context, String key) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/$key.json');
+    final historyDir = await _getHistoryDirectory();
+    final file = File('${historyDir.path}/$key.json');
     if (await file.exists()) {
       return await file.readAsString();
     }
     return null;
   }
 
-  // Temp data: use app support directory for desktop (within app files)
-  static const String _tempFileName = 'cv_temp_autosave.json';
-  static const String _tempPdfFileName = 'cv_temp_autosave.pdf';
-  static const String _tempPdfMetaFileName = 'cv_temp_autosave_pdf.meta';
-
   @override
   Future<void> loadTempData(BuildContext context) async {
     try {
-      final appDir = await getApplicationSupportDirectory();
-      final tempFile = File('${appDir.path}/$_tempFileName');
+      final tempDir = await _getTempDirectory();
+      final tempFile = File('${tempDir.path}/$_tempFileName');
       if (await tempFile.exists()) {
         final jsonData = await tempFile.readAsString();
         try {
@@ -212,8 +245,8 @@ class CVFileHandlerDesktop implements CVFileHandler {
   @override
   Future<void> saveTempData(BuildContext context) async {
     try {
-      final appDir = await getApplicationSupportDirectory();
-      final tempFile = File('${appDir.path}/$_tempFileName');
+      final tempDir = await _getTempDirectory();
+      final tempFile = File('${tempDir.path}/$_tempFileName');
       final provider = context.read<CVDataProvider>();
       // Use inputTabsJson if available (latest from InputView), otherwise fall back to jsonData
       final jsonData =
@@ -228,9 +261,9 @@ class CVFileHandlerDesktop implements CVFileHandler {
   @override
   Future<void> loadTempPdfData(BuildContext context) async {
     try {
-      final appDir = await getApplicationSupportDirectory();
-      final tempPdfFile = File('${appDir.path}/$_tempPdfFileName');
-      final tempMetaFile = File('${appDir.path}/$_tempPdfMetaFileName');
+      final tempDir = await _getTempDirectory();
+      final tempPdfFile = File('${tempDir.path}/$_tempPdfFileName');
+      final tempMetaFile = File('${tempDir.path}/$_tempPdfMetaFileName');
 
       if (await tempPdfFile.exists() && await tempMetaFile.exists()) {
         final pdfBytes = await tempPdfFile.readAsBytes();
@@ -243,7 +276,7 @@ class CVFileHandlerDesktop implements CVFileHandler {
             isTemplate,
           );
           debugPrint(
-            'DEBUG: Loaded temp PDF data from: ${tempPdfFile.path} (isTemplate: $isTemplate)',
+            'DEBUG: Loaded temp PDF data from: ${tempDir.path} (isTemplate: $isTemplate)',
           );
         }
       }
@@ -259,9 +292,9 @@ class CVFileHandlerDesktop implements CVFileHandler {
     bool isTemplate,
   ) async {
     try {
-      final appDir = await getApplicationSupportDirectory();
-      final tempPdfFile = File('${appDir.path}/$_tempPdfFileName');
-      final tempMetaFile = File('${appDir.path}/$_tempPdfMetaFileName');
+      final tempDir = await _getTempDirectory();
+      final tempPdfFile = File('${tempDir.path}/$_tempPdfFileName');
+      final tempMetaFile = File('${tempDir.path}/$_tempPdfMetaFileName');
 
       if (pdfBytes != null && pdfBytes.isNotEmpty) {
         await tempPdfFile.writeAsBytes(pdfBytes);
