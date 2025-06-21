@@ -83,6 +83,7 @@ class _InputViewState extends State<InputView> {
               'enabled': true,
               'instances': [
                 {
+                  'enabled': true,
                   'mainHeader': {'enabled': true, 'value': ''},
                   'extraInfo': {'enabled': true, 'value': ''},
                   'link': {'enabled': true, 'value': ''},
@@ -240,6 +241,7 @@ class _InputViewState extends State<InputView> {
     // Helper function to create a single instance with customized field states
     Map<String, dynamic> createInstance(Map<String, bool> fieldStates) {
       return {
+        'enabled': true, // Instance is enabled by default
         'expanded': true, // New instances start expanded
         'mainHeader': {
           'enabled': fieldStates['mainHeader'] ?? true,
@@ -456,6 +458,9 @@ class _InputViewState extends State<InputView> {
             instances.map((instance) {
               final instanceMap = <String, dynamic>{};
 
+              // Add instance-level enabled state
+              instanceMap['enabled'] = instance['enabled'] ?? true;
+
               // Add all body fields for this instance
               for (final key in [
                 'mainHeader',
@@ -573,6 +578,9 @@ class _InputViewState extends State<InputView> {
                 final instances = <Map<String, dynamic>>[];
                 for (final instanceData in section['instances']) {
                   final instance = <String, dynamic>{
+                    'enabled':
+                        instanceData['enabled'] ??
+                        true, // Default enabled for loaded data
                     'expanded':
                         instanceData['expanded'] ??
                         true, // Default expanded for loaded data
@@ -789,6 +797,9 @@ class _InputViewState extends State<InputView> {
                 final instances = <Map<String, dynamic>>[];
                 for (final instanceData in section['instances']) {
                   final instance = <String, dynamic>{
+                    'enabled':
+                        instanceData['enabled'] ??
+                        true, // Default enabled for loaded data
                     'expanded':
                         instanceData['expanded'] ??
                         true, // Default expanded for loaded data
@@ -1725,6 +1736,7 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: instances.length,
+              buildDefaultDragHandles: isEditing,
               onReorder:
                   isEditing
                       ? (oldIndex, newIndex) {
@@ -1743,16 +1755,23 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
 
                 // Ensure backward compatibility: add 'expanded' field if missing
                 final isExpanded = instance['expanded'] ?? true;
+                final isInstanceEnabled = instance['enabled'] ?? true;
 
                 // Get enhanced colors for better contrast, especially in dark mode
                 final theme = Theme.of(context);
                 final isDark = theme.brightness == Brightness.dark;
-                final cardColor =
+                var cardColor =
                     isDark ? theme.colorScheme.surface : theme.cardColor;
-                final borderColor =
+                var borderColor =
                     isDark
                         ? theme.colorScheme.outline.withOpacity(0.5)
                         : theme.dividerColor;
+
+                // Apply disabled styling if instance is not enabled
+                if (!isInstanceEnabled) {
+                  cardColor = cardColor.withOpacity(0.5);
+                  borderColor = borderColor.withOpacity(0.3);
+                }
 
                 return Card(
                   key: ValueKey(
@@ -1768,226 +1787,256 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
                       width: isDark ? 1.5 : 1.0,
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Instance header with expand/collapse, drag handle and delete button
-                        Row(
-                          children: [
-                            if (isEditing && instances.length > 1)
-                              Icon(Icons.drag_handle, color: Colors.grey[600]),
-                            if (isEditing && instances.length > 1)
-                              const SizedBox(width: 8),
-                            // Expand/collapse button
-                            InkWell(
-                              onTap: () {
-                                instance['expanded'] = !isExpanded;
-                                widget.onChanged(tab.copy()..data = data);
-                              },
-                              borderRadius: BorderRadius.circular(4),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isExpanded
-                                          ? Icons.expand_less
-                                          : Icons.expand_more,
-                                      size: 20,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Instance ${instanceIndex + 1}',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall?.copyWith(
+                  child: Opacity(
+                    opacity: isInstanceEnabled ? 1.0 : 0.6,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Instance header with expand/collapse, enabled checkbox, drag handle and delete button
+                          Row(
+                            children: [
+                              if (isEditing && instances.length > 1)
+                                Icon(
+                                  Icons.drag_handle,
+                                  color: Colors.grey[600],
+                                ),
+                              if (isEditing && instances.length > 1)
+                                const SizedBox(width: 8),
+                              // Instance enabled checkbox
+                              if (isEditing)
+                                Tooltip(
+                                  message: 'Enable/disable this instance',
+                                  child: Checkbox(
+                                    value: instance['enabled'] ?? true,
+                                    onChanged: (value) {
+                                      instance['enabled'] = value ?? true;
+                                      widget.onChanged(tab.copy()..data = data);
+                                      setState(() {});
+                                    },
+                                  ),
+                                ),
+                              if (isEditing) const SizedBox(width: 8),
+                              // Expand/collapse button
+                              InkWell(
+                                onTap: () {
+                                  instance['expanded'] = !isExpanded;
+                                  widget.onChanged(tab.copy()..data = data);
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isExpanded
+                                            ? Icons.expand_less
+                                            : Icons.expand_more,
+                                        size: 20,
                                         color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Instance ${instanceIndex + 1}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleSmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              if (isEditing && instances.length > 1)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () {
+                                    instances.removeAt(instanceIndex);
+                                    widget.onChanged(tab.copy()..data = data);
+                                    setState(
+                                      () {},
+                                    ); // Only needed for add/remove
+                                  },
+                                ),
+                            ],
+                          ),
+
+                          // Collapsible content
+                          if (isExpanded) ...[
+                            const SizedBox(height: 16),
+
+                            // Main Header field
+                            _buildInstanceField(
+                              context,
+                              label: 'Main Header',
+                              instance: instance,
+                              fieldKey: 'mainHeader',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Extra Info field
+                            _buildInstanceField(
+                              context,
+                              label: 'Extra Info',
+                              instance: instance,
+                              fieldKey: 'extraInfo',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Link field
+                            _buildInstanceField(
+                              context,
+                              label: 'Link',
+                              instance: instance,
+                              fieldKey: 'link',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Date field
+                            _buildInstanceField(
+                              context,
+                              label: 'Date',
+                              instance: instance,
+                              fieldKey: 'date',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Secondary Header field
+                            _buildInstanceField(
+                              context,
+                              label: 'Secondary Header',
+                              instance: instance,
+                              fieldKey: 'secondaryHeader',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Location field
+                            _buildInstanceField(
+                              context,
+                              label: 'Location',
+                              instance: instance,
+                              fieldKey: 'location',
+                              instanceIndex: instanceIndex,
+                              isEditing: isEditing,
+                              onChanged:
+                                  () =>
+                                      widget.onChanged(tab.copy()..data = data),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Descriptions section
+                            Text(
+                              'Descriptions',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            ...List.generate(descriptions.length, (i) {
+                              final desc = descriptions[i];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: desc['enabled'] ?? true,
+                                      onChanged:
+                                          isEditing
+                                              ? (val) {
+                                                desc['enabled'] = val;
+                                                widget.onChanged(
+                                                  tab.copy()..data = data,
+                                                );
+                                              }
+                                              : null,
+                                    ),
+                                    Expanded(
+                                      child: TextFormField(
+                                        key: ValueKey(
+                                          'body-description-$instanceIndex-$i',
+                                        ),
+                                        initialValue: desc['value'] ?? '',
+                                        enabled: isEditing,
+                                        decoration: InputDecoration(
+                                          labelText: 'Description ${i + 1}',
+                                          border: const OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          desc['value'] = value;
+                                        },
                                       ),
                                     ),
+                                    if (isEditing)
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                        ),
+                                        onPressed: () {
+                                          descriptions.removeAt(i);
+                                          widget.onChanged(
+                                            tab.copy()..data = data,
+                                          );
+                                          setState(
+                                            () {},
+                                          ); // Only needed for add/remove
+                                        },
+                                      ),
                                   ],
                                 ),
-                              ),
-                            ),
-                            const Spacer(),
-                            if (isEditing && instances.length > 1)
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
+                              );
+                            }),
+                            if (isEditing)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: TextButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Description'),
+                                  onPressed: () {
+                                    descriptions.add({
+                                      'enabled': true,
+                                      'value': '',
+                                    });
+                                    widget.onChanged(tab.copy()..data = data);
+                                    setState(
+                                      () {},
+                                    ); // Only needed for add/remove
+                                  },
                                 ),
-                                onPressed: () {
-                                  instances.removeAt(instanceIndex);
-                                  widget.onChanged(tab.copy()..data = data);
-                                  setState(() {}); // Only needed for add/remove
-                                },
                               ),
-                          ],
-                        ),
-
-                        // Collapsible content
-                        if (isExpanded) ...[
-                          const SizedBox(height: 16),
-
-                          // Main Header field
-                          _buildInstanceField(
-                            context,
-                            label: 'Main Header',
-                            instance: instance,
-                            fieldKey: 'mainHeader',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Extra Info field
-                          _buildInstanceField(
-                            context,
-                            label: 'Extra Info',
-                            instance: instance,
-                            fieldKey: 'extraInfo',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Link field
-                          _buildInstanceField(
-                            context,
-                            label: 'Link',
-                            instance: instance,
-                            fieldKey: 'link',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Date field
-                          _buildInstanceField(
-                            context,
-                            label: 'Date',
-                            instance: instance,
-                            fieldKey: 'date',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Secondary Header field
-                          _buildInstanceField(
-                            context,
-                            label: 'Secondary Header',
-                            instance: instance,
-                            fieldKey: 'secondaryHeader',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Location field
-                          _buildInstanceField(
-                            context,
-                            label: 'Location',
-                            instance: instance,
-                            fieldKey: 'location',
-                            instanceIndex: instanceIndex,
-                            isEditing: isEditing,
-                            onChanged:
-                                () => widget.onChanged(tab.copy()..data = data),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Descriptions section
-                          Text(
-                            'Descriptions',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                          ...List.generate(descriptions.length, (i) {
-                            final desc = descriptions[i];
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Row(
-                                children: [
-                                  Checkbox(
-                                    value: desc['enabled'] ?? true,
-                                    onChanged:
-                                        isEditing
-                                            ? (val) {
-                                              desc['enabled'] = val;
-                                              widget.onChanged(
-                                                tab.copy()..data = data,
-                                              );
-                                            }
-                                            : null,
-                                  ),
-                                  Expanded(
-                                    child: TextFormField(
-                                      key: ValueKey(
-                                        'body-description-$instanceIndex-$i',
-                                      ),
-                                      initialValue: desc['value'] ?? '',
-                                      enabled: isEditing,
-                                      decoration: InputDecoration(
-                                        labelText: 'Description ${i + 1}',
-                                        border: const OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        desc['value'] = value;
-                                      },
-                                    ),
-                                  ),
-                                  if (isEditing)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        color: Colors.red,
-                                      ),
-                                      onPressed: () {
-                                        descriptions.removeAt(i);
-                                        widget.onChanged(
-                                          tab.copy()..data = data,
-                                        );
-                                        setState(
-                                          () {},
-                                        ); // Only needed for add/remove
-                                      },
-                                    ),
-                                ],
-                              ),
-                            );
-                          }),
-                          if (isEditing)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: TextButton.icon(
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Description'),
-                                onPressed: () {
-                                  descriptions.add({
-                                    'enabled': true,
-                                    'value': '',
-                                  });
-                                  widget.onChanged(tab.copy()..data = data);
-                                  setState(() {}); // Only needed for add/remove
-                                },
-                              ),
-                            ),
-                        ], // Close the if (isExpanded) conditional content
-                      ],
+                          ], // Close the if (isExpanded) conditional content
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -2003,6 +2052,7 @@ class _InputTabWidgetState extends State<_InputTabWidget> {
                   final firstInstance =
                       instances.isNotEmpty ? instances[0] : null;
                   final newInstance = <String, dynamic>{
+                    'enabled': true, // New instances start enabled
                     'expanded': true, // New instances start expanded
                   };
 
