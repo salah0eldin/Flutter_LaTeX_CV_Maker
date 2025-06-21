@@ -28,6 +28,10 @@ class CVDataProvider extends ChangeNotifier {
   bool _autosaveDataLoaded = false; // Track when autosave data is loaded
   bool _jsonImported = false; // Track when JSON data has been imported
 
+  // Track which view was most recently edited
+  DateTime _jsonDataLastModified = DateTime.now();
+  DateTime _inputTabsJsonLastModified = DateTime.now();
+
   // PDF temp state
   Uint8List? _tempPdfBytes;
   bool _tempPdfIsTemplate = false;
@@ -50,11 +54,21 @@ class CVDataProvider extends ChangeNotifier {
   Uint8List? get tempPdfBytes => _tempPdfBytes;
   bool get tempPdfIsTemplate => _tempPdfIsTemplate;
 
+  // Get the most recently edited data (either jsonData or inputTabsJson)
+  String get mostRecentEditData {
+    if (_inputTabsJsonLastModified.isAfter(_jsonDataLastModified)) {
+      return _inputTabsJson;
+    } else {
+      return _jsonData;
+    }
+  }
+
   // =====================================
   // Setters
   // =====================================
   set inputTabsJson(String value) {
     _inputTabsJson = value;
+    _inputTabsJsonLastModified = DateTime.now();
     notifyListeners();
     _triggerAutoSave(); // Auto-save when input tabs JSON changes
   }
@@ -78,6 +92,7 @@ class CVDataProvider extends ChangeNotifier {
   // =====================================
   void updateJsonData(String newData) {
     _jsonData = newData;
+    _jsonDataLastModified = DateTime.now();
     try {
       _parsedJsonData = json.decode(newData);
     } catch (e) {
@@ -91,6 +106,16 @@ class CVDataProvider extends ChangeNotifier {
   void updateJsonDataFromImport(String newData) {
     updateJsonData(newData);
     _jsonImported = true;
+    // Reset edit mode since we've imported fresh data
+    _editMode = EditMode.none;
+    // Synchronize inputTabsJson with the imported data
+    _inputTabsJson = newData;
+    _inputTabsJsonLastModified = DateTime.now();
+    // Clear dirty flags since both views are now synchronized
+    _jsonDirtyFromInput = false;
+    _inputDirtyFromJson = false;
+    // Clear any existing draft data to start fresh
+    _inputTabsDraft = null;
     notifyListeners();
     // Note: updateJsonData already calls _triggerAutoSave()
   }
@@ -100,6 +125,7 @@ class CVDataProvider extends ChangeNotifier {
   // =====================================
   void updateParsedJsonData(dynamic newParsedData) {
     _parsedJsonData = newParsedData;
+    _jsonDataLastModified = DateTime.now();
     try {
       _jsonData = json.encode(newParsedData);
     } catch (e) {

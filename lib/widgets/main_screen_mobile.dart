@@ -92,26 +92,63 @@ class CVFileHandlerMobile implements CVFileHandler {
 
   @override
   Future<void> saveToHistory(BuildContext context, String jsonData) async {
-    try {
-      final historyDir = await _getHistoryDirectory();
+    debugPrint('DEBUG: Mobile handler saveToHistory called');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Save to History'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: 'Enter a name for your CV',
+              labelText: 'CV Name',
+            ),
+            autofocus: true,
+            onSubmitted: (value) => Navigator.of(context).pop(controller.text),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () => Navigator.of(context).pop(controller.text),
+            ),
+          ],
+        );
+      },
+    );
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${historyDir.path}/cv_$timestamp.json');
-      await file.writeAsString(jsonData);
+    debugPrint('DEBUG: Dialog returned name: $name');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('CV saved to history!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save to history: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (name != null && name.isNotEmpty) {
+      try {
+        final sanitized = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+        final historyDir = await _getHistoryDirectory();
+        final file = File('${historyDir.path}/cv_history_$sanitized.json');
+        await file.writeAsString(jsonData);
+
+        debugPrint('DEBUG: Successfully saved to history: $sanitized');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved "$sanitized" to history'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        debugPrint('DEBUG: Error saving to history: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save to history: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      debugPrint('DEBUG: Save cancelled or empty name');
     }
   }
 

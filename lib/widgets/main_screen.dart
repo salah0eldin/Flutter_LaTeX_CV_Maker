@@ -73,9 +73,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   // Save to History (delegated)
   // =====================================
   Future<void> _saveToHistory() async {
-    final jsonData = context.read<CVDataProvider>().jsonData;
+    final mostRecentData = context.read<CVDataProvider>().mostRecentEditData;
     try {
-      json.decode(jsonData);
+      json.decode(mostRecentData);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -85,7 +85,7 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
       );
       return;
     }
-    await _fileHandler.saveToHistory(context, jsonData);
+    await _fileHandler.saveToHistory(context, mostRecentData);
   }
 
   // =====================================
@@ -210,13 +210,9 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
     final jsonContent = await _fileHandler.importFromFile(context);
     if (jsonContent != null) {
       // Update provider with imported data (using import-specific method)
+      // This will automatically reset edit mode, sync both views, and clear dirty flags
       final provider = context.read<CVDataProvider>();
       provider.updateJsonDataFromImport(jsonContent);
-
-      // Clear any existing draft data and dirty flags to start fresh
-      provider.inputTabsDraft = null;
-      provider.clearJsonDirtyFromInput();
-      provider.clearInputDirtyFromJson();
 
       // Auto-save will be triggered automatically by provider when data changes
 
